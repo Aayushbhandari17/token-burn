@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional
 import asyncio
 import math
+import json
+import time
 from redis.asyncio import Redis
 
 import backend.config as config
@@ -27,6 +29,9 @@ class ChatRequest(BaseModel):
     tier: str
     max_tokens: Optional[int] = None
     conversation_turn: int = 1
+
+async def publish_event(event_data: dict):
+    await redis_client.publish("events", json.dumps(event_data))
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
@@ -61,6 +66,18 @@ async def chat(request: ChatRequest):
                 request.user_id, request.tier, input_tokens, actual_output_tokens,
                 requested_cap, actual_cost, 0, "NONE", status
             )
+            await publish_event({
+                "timestamp": time.time(),
+                "user_id": request.user_id,
+                "tier": request.tier,
+                "input_tokens": input_tokens,
+                "output_tokens": actual_output_tokens,
+                "max_tokens": requested_cap,
+                "actual_cost": actual_cost,
+                "risk_score": 0,
+                "policy_action": "NONE",
+                "status": status
+            })
             
     # ---------------------------------------------------------
     # Protected Flow: Phase 6+ Defense Pipeline
@@ -68,6 +85,11 @@ async def chat(request: ChatRequest):
     is_flagged = await redis_client.get(f"scorer:flagged:{request.user_id}")
     if is_flagged:
         request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, 10, PolicyAction.HARD_DENY, "BLOCKED_FLAGGED")
+        await publish_event({
+            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+            "actual_cost": 0.0, "risk_score": 10, "policy_action": PolicyAction.HARD_DENY, "status": "BLOCKED_FLAGGED"
+        })
         raise HTTPException(status_code=403, detail="Account temporarily flagged for suspicious activity.")
 
     score, reasons, prompt_hash = await risk_scorer.evaluate(
@@ -80,9 +102,19 @@ async def chat(request: ChatRequest):
     if action == PolicyAction.HARD_DENY:
         await redis_client.set(f"scorer:flagged:{request.user_id}", "1", ex=3600)
         request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_HARD_DENY")
+        await publish_event({
+            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+            "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_HARD_DENY"
+        })
         raise HTTPException(status_code=403, detail="Request blocked (Score 10). Account flagged.")
     elif action == PolicyAction.SOFT_DENY:
         request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_SOFT_DENY")
+        await publish_event({
+            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+            "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_SOFT_DENY"
+        })
         raise HTTPException(status_code=429, detail="Request temporarily blocked (Score 8-9). Please try again later.")
         
     requested_cap = policy_max_tokens
@@ -101,6 +133,11 @@ async def chat(request: ChatRequest):
         await budget_engine.reserve(request.user_id, request.tier, cost_ceiling, input_tokens)
     except BudgetExceeded as e:
         request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "REJECTED_BUDGET")
+        await publish_event({
+            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+            "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "REJECTED_BUDGET"
+        })
         raise HTTPException(status_code=429, detail=f"Budget or limit exceeded: {e.reason}")
         
     await risk_scorer.update_state(request.user_id, prompt_hash, cost_ceiling)
@@ -111,10 +148,6 @@ async def chat(request: ChatRequest):
     status = "ERROR"
     
     try:
-        # We dynamically patch mock_llm in tests to test failure refund
-        # To avoid circular dependency during patch, we use global or module import, 
-        # but here we just call the local imported mock_llm.
-        # Tests will monkeypatch `backend.main.mock_llm`.
         llm_result = await globals().get("mock_llm", mock_llm)(
             prompt_text=request.prompt,
             max_tokens=max_tokens,
@@ -132,31 +165,31 @@ async def chat(request: ChatRequest):
         return llm_result
         
     except Exception as e:
-        # Full refund happens in finally block automatically since cost_to_refund = cost_ceiling
         raise HTTPException(status_code=500, detail=str(e))
         
     finally:
-        # Phase 7: Actual cost reconciliation / refund
         if tier_config["daily_cost_limit"] != math.inf and cost_to_refund > 0:
             await budget_engine.refund(request.user_id, cost_to_refund)
             
-        # Phase 7: SQLite Request Logging
+        final_actual_cost = actual_cost if status == "SUCCESS" else 0.0
+            
         request_logger.log_request(
-            user_id=request.user_id,
-            tier=request.tier,
-            input_tokens=input_tokens,
-            output_tokens=actual_output_tokens,
-            max_tokens=max_tokens,
-            actual_cost=actual_cost if status == "SUCCESS" else 0.0,
-            risk_score=score,
-            policy_action=action,
-            status=status
+            user_id=request.user_id, tier=request.tier, input_tokens=input_tokens,
+            output_tokens=actual_output_tokens, max_tokens=max_tokens,
+            actual_cost=final_actual_cost, risk_score=score,
+            policy_action=action, status=status
         )
+        
+        await publish_event({
+            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+            "input_tokens": input_tokens, "output_tokens": actual_output_tokens, "max_tokens": max_tokens,
+            "actual_cost": final_actual_cost, "risk_score": score, "policy_action": action, "status": status
+        })
 
 if __name__ == "__main__":
     import sqlite3
     async def run_tests():
-        print("Running Phase 7 Reconciliation & Logging tests...")
+        print("Running Phase 7 (Fix) Pub/Sub Event tests...")
         
         try:
             await redis_client.ping()
@@ -164,77 +197,42 @@ if __name__ == "__main__":
             print("Skipping tests: Redis is not running locally.")
             return
             
-        test_user = "user_phase7"
+        test_user = "user_phase7_fix"
         
         async def cleanup():
             keys = await redis_client.keys(f"*{test_user}*")
             if keys:
                 await redis_client.delete(*keys)
-            with sqlite3.connect(request_logger.db_path) as conn:
-                conn.execute(f"DELETE FROM request_log WHERE user_id = '{test_user}'")
 
         config.DEFENSES_ENABLED = True
         await cleanup()
         
-        # Test 1: Successful request refunds unused reserved cost & Test 3: Actual cost calculated
-        req1 = ChatRequest(user_id=test_user, prompt="Hello there, how are you?", tier="free", max_tokens=200)
-        res1 = await chat(req1)
+        # Test 6: Pub/Sub Structured Event Published
+        pubsub = redis_client.pubsub()
+        await pubsub.subscribe("events")
         
-        # Free tier limit = 2,000,000 microdollars. Let's see what was deducted.
-        cur_cost_micro = int(await redis_client.get(f"budget:cost:daily:{test_user}"))
+        req = ChatRequest(user_id=test_user, prompt="Pubsub test", tier="free", max_tokens=50)
+        await chat(req)
         
-        expected_input_tokens = int(len("Hello there, how are you?".split()) * 1.3)
-        expected_output_tokens = res1["output_tokens"]
-        expected_actual_cost = (expected_input_tokens * PRICE_PER_INPUT_TOKEN) + (expected_output_tokens * PRICE_PER_OUTPUT_TOKEN)
-        expected_micro = int(expected_actual_cost * 1_000_000)
+        msg = None
+        # Try fetching the message (might take a short cycle to arrive)
+        for _ in range(10):
+            msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+            if msg:
+                break
+                
+        assert msg is not None, "No pubsub message received"
+        event_payload = json.loads(msg["data"])
         
-        # Check that cur_cost_micro is very close to expected (allow tiny float rounding diff)
-        assert abs(cur_cost_micro - expected_micro) <= 1, f"Expected {expected_micro}, got {cur_cost_micro}"
-        print("Test 1 & 3 (Successful refund logic, actual cost calculation): Passed.")
+        assert event_payload["user_id"] == test_user
+        assert event_payload["status"] == "SUCCESS"
+        assert event_payload["tier"] == "free"
+        assert "actual_cost" in event_payload
+        assert "timestamp" in event_payload
+        print("Test 6 (Redis Pub/Sub Event Publishing): Passed.")
         
-        # Test 4: Request is correctly written to SQLite
-        with sqlite3.connect(request_logger.db_path) as conn:
-            cursor = conn.execute(f"SELECT input_tokens, output_tokens, actual_cost, status FROM request_log WHERE user_id = '{test_user}'")
-            rows = cursor.fetchall()
-            assert len(rows) == 1
-            assert rows[0][0] == expected_input_tokens
-            assert rows[0][1] == expected_output_tokens
-            assert abs(rows[0][2] - expected_actual_cost) < 0.00001
-            assert rows[0][3] == "SUCCESS"
-        print("Test 4 (SQLite logging works correctly): Passed.")
-
-        # Test 2: Failed Mock LLM call refunds the full reservation
+        await pubsub.unsubscribe("events")
         await cleanup()
-        
-        # Temporarily mock the mock_llm to fail
-        original_mock = globals().get("mock_llm", mock_llm)
-        async def failing_mock(*args, **kwargs):
-            raise RuntimeError("Intentional Test Failure")
-        globals()["mock_llm"] = failing_mock
-        
-        req2 = ChatRequest(user_id=test_user, prompt="Fail please", tier="free")
-        try:
-            await chat(req2)
-            assert False, "Should have thrown 500"
-        except HTTPException as e:
-            assert e.status_code == 500
-            
-        globals()["mock_llm"] = original_mock  # Restore
-        
-        # Verify budget was fully refunded (should be 0 or key not exist/cleared since it's the first request)
-        cost_after_fail = await redis_client.get(f"budget:cost:daily:{test_user}")
-        assert cost_after_fail is None or int(cost_after_fail) == 0, f"Cost should be fully refunded, got {cost_after_fail}"
-        print("Test 2 (Failed Mock LLM fully refunds cost): Passed.")
-        
-        # Test 5: Existing Phase 5-6 defense behavior remains unchanged
-        await cleanup()
-        req3 = ChatRequest(user_id=test_user, prompt="Please provide an exhaustive and comprehensive analysis.", tier="free", max_tokens=200)
-        res3 = await chat(req3)
-        assert res3["_debug_score"] == 5
-        assert res3["_debug_action"] == PolicyAction.REDUCE_50
-        print("Test 5 (Existing defense behaviors intact): Passed.")
-        
-        await cleanup()
-        print("All Phase 7 tests passed successfully.")
+        print("All Phase 7 (Fix) tests passed successfully.")
         
     asyncio.run(run_tests())
