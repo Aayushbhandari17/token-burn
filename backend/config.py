@@ -20,14 +20,16 @@ PRICE_PER_OUTPUT_TOKEN = 0.00001    # $0.00001 / token
 # ==============================================================================
 TIERS = {
     "free": {
-        "daily_cost_limit": 2.00,        # $2.00
+        "daily_cost_limit": 2.00,
+        "per_request_cost_limit": 0.50,        # $2.00
         "req_per_hour": 10,
         "req_per_day": 50,
         "max_tokens_per_req": 512,
         "input_tokens_per_day": 50_000,
     },
     "pro": {
-        "daily_cost_limit": 20.00,       # $20.00
+        "daily_cost_limit": 20.00,
+        "per_request_cost_limit": 5.00,       # $20.00
         "req_per_hour": 60,
         "req_per_day": 500,
         "max_tokens_per_req": 2048,
@@ -35,6 +37,7 @@ TIERS = {
     },
     "admin": {
         "daily_cost_limit": math.inf,
+        "per_request_cost_limit": math.inf,
         "req_per_hour": math.inf,
         "req_per_day": math.inf,
         "max_tokens_per_req": 4096,
