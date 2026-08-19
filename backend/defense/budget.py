@@ -111,6 +111,21 @@ class BudgetEngine:
 
         return True
 
+    async def get_remaining_daily_cost(self, user_id: str, tier: str) -> float:
+        """
+        Calculates the remaining daily cost budget for a user.
+        """
+        tier_config = TIERS.get(tier)
+        if not tier_config:
+            return 0.0
+            
+        if tier_config["daily_cost_limit"] == math.inf:
+            return math.inf
+            
+        cur_cost_microdollars = int(await self.redis.get(f"budget:cost:daily:{user_id}") or 0)
+        cur_cost = cur_cost_microdollars / MICRODOLLARS_PER_DOLLAR
+        return max(0.0, tier_config["daily_cost_limit"] - cur_cost)
+
     async def refund(self, user_id: str, unused_cost: float):
         """
         Refunds the unused portion of the reserved cost back to the daily limit.
