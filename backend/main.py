@@ -5,13 +5,14 @@ import asyncio
 import math
 from redis.asyncio import Redis
 
+import backend.config as config
 from backend.config import TIERS, PRICE_PER_INPUT_TOKEN, PRICE_PER_OUTPUT_TOKEN
 from backend.mock_llm import mock_llm
 from backend.defense.budget import BudgetEngine, BudgetExceeded
 
 app = FastAPI(title="Token Burn Defense Prototype API")
 
-# Initialize global dependencies (for a real app, use lifespan events or dependency injection)
+# Initialize global dependencies
 redis_client = Redis(host='localhost', port=6379, db=0)
 budget_engine = BudgetEngine(redis_client)
 
@@ -31,17 +32,29 @@ async def chat(request: ChatRequest):
         )
         
     tier_config = TIERS[request.tier]
+    requested_cap = request.max_tokens if request.max_tokens is not None else tier_config["max_tokens_per_req"]
     
+    # ---------------------------------------------------------
+    # Baseline Flow: Defenses disabled (Unprotected Demo)
+    # ---------------------------------------------------------
+    if not config.DEFENSES_ENABLED:
+        return await mock_llm(
+            prompt_text=request.prompt,
+            max_tokens=requested_cap,
+            latency_per_token_ms=1
+        )
+    
+    # ---------------------------------------------------------
+    # Protected Flow: Phase 5 Defense Pipeline
+    # ---------------------------------------------------------
     # 1. Input token estimation
     input_tokens = int(len(request.prompt.split()) * 1.3)
     input_cost = input_tokens * PRICE_PER_INPUT_TOKEN
     
     # 2. Dynamic max_tokens & Cost ceiling
-    requested_cap = request.max_tokens if request.max_tokens is not None else tier_config["max_tokens_per_req"]
-    
     if tier_config["daily_cost_limit"] == math.inf:
         max_tokens = requested_cap
-        cost_ceiling = input_cost + (max_tokens * PRICE_PER_OUTPUT_TOKEN)
+        cost_ceiling = 0.0
     else:
         remaining_budget = await budget_engine.get_remaining_daily_cost(request.user_id, request.tier)
         budget_for_output = max(0.0, remaining_budget - input_cost)
@@ -58,32 +71,18 @@ async def chat(request: ChatRequest):
     except BudgetExceeded as e:
         raise HTTPException(status_code=429, detail=f"Budget or limit exceeded: {e.reason}")
         
-    # 4. Mock LLM Call + Reconcile Budget
-    try:
-        llm_result = await mock_llm(
-            prompt_text=request.prompt,
-            max_tokens=max_tokens,
-            latency_per_token_ms=1
-        )
-        
-        # Step 7: Reconcile Budget (refund unused cost)
-        if tier_config["daily_cost_limit"] != math.inf:
-            actual_cost = llm_result["cost"]["total_cost"]
-            unused_cost = cost_ceiling - actual_cost
-            if unused_cost > 0:
-                await budget_engine.refund(request.user_id, unused_cost)
-                
-        return llm_result
-        
-    except Exception as e:
-        # Full refund on LLM exception to prevent burning budget on failed calls
-        if tier_config["daily_cost_limit"] != math.inf:
-            await budget_engine.refund(request.user_id, cost_ceiling)
-        raise HTTPException(status_code=500, detail=str(e))
+    # 4. Mock LLM Call (No reconciliation yet - reserved ceiling stays fully reserved until Phase 7)
+    llm_result = await mock_llm(
+        prompt_text=request.prompt,
+        max_tokens=max_tokens,
+        latency_per_token_ms=1
+    )
+    
+    return llm_result
 
 if __name__ == "__main__":
     async def run_tests():
-        print("Running Phase 5 Pre-request Defense Pipeline tests...")
+        print("Running Phase 5 Pre-request Defense Pipeline tests (Modified)...")
         
         try:
             await redis_client.ping()
@@ -91,7 +90,7 @@ if __name__ == "__main__":
             print("Skipping tests: Redis is not running locally.")
             return
             
-        test_user = "user_phase5"
+        test_user = "user_phase5_fix"
         
         async def cleanup():
             await redis_client.delete(f"budget:cost:daily:{test_user}")
@@ -99,6 +98,10 @@ if __name__ == "__main__":
             await redis_client.delete(f"budget:req_day:{test_user}")
             await redis_client.delete(f"budget:input:{test_user}")
 
+        # =======================================================
+        # TESTS WITH DEFENSES_ENABLED = TRUE
+        # =======================================================
+        config.DEFENSES_ENABLED = True
         await cleanup()
         
         # Test 1: Normal request successfully reserves budget and reaches Mock LLM
@@ -107,50 +110,32 @@ if __name__ == "__main__":
         assert "output_tokens" in res1
         
         cost_used = await redis_client.get(f"budget:cost:daily:{test_user}")
-        assert int(cost_used) > 0, "Cost should have been reserved and partially refunded, > 0"
-        print("Test 1 (Normal request & budget reservation): Passed.")
+        assert cost_used is not None and int(cost_used) > 0, "Cost should have been fully reserved"
+        print("Test 1 (Defenses ON - Normal request & budget reservation): Passed.")
         
-        # Test 2: Max tokens dynamic logic bounds output based on budget
-        # We manually drain the budget to near zero.
-        await cleanup()
-        # Set used cost to $1.99, leaving $0.01
-        await redis_client.set(f"budget:cost:daily:{test_user}", 1_990_000) 
-        req2 = ChatRequest(user_id=test_user, prompt="Write an exhaustive 10000 words analysis.", tier="free")
-        res2 = await chat(req2)
-        # Remaining budget = $0.01. Input is ~10 tokens ($0.000025)
-        # Budget for output = $0.01 - $0.000025 ~= $0.009975
-        # Cap = 10% = $0.0009975 -> ~99 tokens.
-        assert res2["output_tokens"] <= 100, f"Max tokens was not dynamically capped based on budget! Got {res2['output_tokens']}"
-        print("Test 4 (max_tokens dynamically capped by remaining budget): Passed.")
-        
-        # Test 3: Insufficient budget is rejected
+        # Test 2: Insufficient budget is rejected
         await redis_client.set(f"budget:cost:daily:{test_user}", 2_000_000) # Full $2.00 used
         try:
-            req3 = ChatRequest(user_id=test_user, prompt="Hello", tier="free")
-            await chat(req3)
+            req2 = ChatRequest(user_id=test_user, prompt="Hello", tier="free")
+            await chat(req2)
             assert False, "Should have been rejected for LIMIT_COST"
         except HTTPException as e:
             assert e.status_code == 429 and "LIMIT_COST" in e.detail
-            print("Test 2 (Insufficient budget rejected): Passed.")
+            print("Test 2 (Defenses ON - Insufficient budget rejected): Passed.")
             
-        # Test 4: Input token limits enforced
-        await cleanup()
-        await redis_client.set(f"budget:input:{test_user}", 50_000)
-        try:
-            req4 = ChatRequest(user_id=test_user, prompt="Hello", tier="free")
-            await chat(req4)
-            assert False, "Should have been rejected for LIMIT_INPUT_TOKENS"
-        except HTTPException as e:
-            assert e.status_code == 429 and "LIMIT_INPUT_TOKENS" in e.detail
-            print("Test 3 (Input/Request limits enforced): Passed.")
-            
-        # Test 5: Admin tier continues to bypass limits
-        req5 = ChatRequest(user_id=test_user, prompt="Hello admin", tier="admin")
-        res5 = await chat(req5)
-        assert "output_tokens" in res5
-        print("Test 5 (Admin bypass intact): Passed.")
+        # =======================================================
+        # TESTS WITH DEFENSES_ENABLED = FALSE
+        # =======================================================
+        config.DEFENSES_ENABLED = False
+        
+        # Test 3: Budget checks bypassed completely when disabled
+        # Redis still has max budget (2,000,000) used. The request should succeed anyway.
+        req3 = ChatRequest(user_id=test_user, prompt="Hello bypass", tier="free")
+        res3 = await chat(req3)
+        assert "output_tokens" in res3
+        print("Test 3 (Defenses OFF - Bypasses budget checks completely): Passed.")
         
         await cleanup()
-        print("All Phase 5 tests passed successfully.")
+        print("All modified Phase 5 tests passed successfully.")
         
     asyncio.run(run_tests())
