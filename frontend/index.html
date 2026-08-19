@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Burn | Live Spend Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background: #eceff1; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .feed { max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85em; }
+        .feed-item { padding: 8px; border-bottom: 1px solid #f0f0f0; border-radius: 4px; margin-bottom: 4px; }
+        .blocked { background: #ffebee; color: #c62828; border-left: 4px solid #c62828; }
+        .allowed { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #2e7d32; }
+        h2 { margin-top: 0; font-size: 1.1em; color: #546e7a; text-transform: uppercase; letter-spacing: 0.5px; }
+        .big-number { font-size: 3em; font-weight: bold; color: #263238; }
+        .chart-container { position: relative; height: 250px; width: 100%; }
+    </style>
+</head>
+<body>
+    <h1 style="color: #263238; margin-bottom: 20px;">Live Spend Dashboard</h1>
+    <div class="grid">
+        <!-- Panel 1: Global Spend Meter -->
+        <div class="card">
+            <h2>Global Spend Meter</h2>
+            <div class="big-number" id="global-spend">$0.0000</div>
+            <p style="color: #78909c; font-size: 0.9em; margin-top: 5px;">Total captured cost across all requests</p>
+        </div>
+
+        <!-- Panel 2: Spend Velocity -->
+        <div class="card">
+            <h2>Spend Velocity</h2>
+            <div class="chart-container"><canvas id="velocityChart"></canvas></div>
+        </div>
+
+        <!-- Panel 3: Cost Breakdown -->
+        <div class="card">
+            <h2>Cost Breakdown (By Tier)</h2>
+            <div class="chart-container"><canvas id="breakdownChart"></canvas></div>
+        </div>
+
+        <!-- Panel 4: Request Heatmap -->
+        <div class="card">
+            <h2>Request Heatmap (Scores)</h2>
+            <div class="chart-container"><canvas id="heatmapChart"></canvas></div>
+        </div>
+
+        <!-- Panel 5: Per-user Budget Gauges -->
+        <div class="card">
+            <h2>Per-user Budget Gauges</h2>
+            <div class="feed" id="user-gauges">
+                <div style="color: #90a4ae; padding: 10px;">Awaiting data...</div>
+            </div>
+        </div>
+
+        <!-- Panel 6: Defense Action Feed -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2>Defense Action Feed</h2>
+            <div class="feed" id="action-feed">
+                <div style="color: #90a4ae; padding: 10px;">Listening for live events...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data State
+        let totalSpend = 0.0;
+        let userSpend = {};
+        let tierSpend = { "free": 0.0, "pro": 0.0, "admin": 0.0 };
+        let actionFeedEmpty = true;
+        let gaugesEmpty = true;
+        
+        // Setup Charts
+        const velCtx = document.getElementById('velocityChart').getContext('2d');
+        const velocityChart = new Chart(velCtx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Cost / Event ($)', data: [], borderColor: '#2196f3', tension: 0.3, fill: true, backgroundColor: 'rgba(33, 150, 243, 0.1)' }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false } }, plugins: { legend: { display: false } } }
+        });
+
+        const breakCtx = document.getElementById('breakdownChart').getContext('2d');
+        const breakdownChart = new Chart(breakCtx, {
+            type: 'doughnut',
+            data: { labels: ['Free', 'Pro', 'Admin'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#4caf50', '#ff9800', '#f44336'] }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        const heatCtx = document.getElementById('heatmapChart').getContext('2d');
+        const heatmapChart = new Chart(heatCtx, {
+            type: 'bar',
+            data: { labels: [], datasets: [{ label: 'Risk Score', data: [], backgroundColor: [] }] },
+            options: { 
+                responsive: true, maintainAspectRatio: false, 
+                scales: { x: { display: false }, y: { min: 0, max: 10 } },
+                plugins: { legend: { display: false } }
+            }
+        });
+
+        // Initialize SSE Connection
+        const evtSource = new EventSource("/dashboard/stream");
+        evtSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            const cost = parseFloat(data.actual_cost) || 0.0;
+            const timeLabel = new Date(data.timestamp * 1000).toLocaleTimeString();
+            
+            // 1. Update Global Spend
+            totalSpend += cost;
+            document.getElementById('global-spend').innerText = '$' + totalSpend.toFixed(4);
+            
+            // 2. Update Velocity Chart (Rolling 50 events)
+            velocityChart.data.labels.push(timeLabel);
+            velocityChart.data.datasets[0].data.push(cost);
+            if (velocityChart.data.labels.length > 50) {
+                velocityChart.data.labels.shift();
+                velocityChart.data.datasets[0].data.shift();
+            }
+            velocityChart.update();
+            
+            // 3. Update Breakdown Chart
+            if (data.tier in tierSpend) {
+                tierSpend[data.tier] += cost;
+                breakdownChart.data.datasets[0].data = [tierSpend['free'], tierSpend['pro'], tierSpend['admin']];
+                breakdownChart.update();
+            }
+            
+            // 4. Update Heatmap (Risk Score)
+            heatmapChart.data.labels.push(timeLabel);
+            heatmapChart.data.datasets[0].data.push(data.risk_score);
+            let heatColor = '#4caf50'; // green
+            if (data.risk_score >= 8) heatColor = '#f44336'; // red
+            else if (data.risk_score >= 5) heatColor = '#ff9800'; // orange
+            heatmapChart.data.datasets[0].backgroundColor.push(heatColor);
+            
+            if (heatmapChart.data.labels.length > 50) {
+                heatmapChart.data.labels.shift();
+                heatmapChart.data.datasets[0].data.shift();
+                heatmapChart.data.datasets[0].backgroundColor.shift();
+            }
+            heatmapChart.update();
+            
+            // 5. Update User Gauges
+            if (gaugesEmpty) { document.getElementById('user-gauges').innerHTML = ''; gaugesEmpty = false; }
+            if (!userSpend[data.user_id]) userSpend[data.user_id] = 0;
+            userSpend[data.user_id] += cost;
+            const gaugesDiv = document.getElementById('user-gauges');
+            gaugesDiv.innerHTML = Object.entries(userSpend)
+                .sort((a,b) => b[1] - a[1]) // highest first
+                .map(([user, amt]) => `<div class="feed-item" style="display: flex; justify-content: space-between;"><strong>${user}</strong> <span>$${amt.toFixed(4)}</span></div>`)
+                .join('');
+                
+            // 6. Update Action Feed
+            if (actionFeedEmpty) { document.getElementById('action-feed').innerHTML = ''; actionFeedEmpty = false; }
+            const feedDiv = document.getElementById('action-feed');
+            const isBlocked = data.status.includes('BLOCK') || data.status.includes('REJECT');
+            const cssClass = isBlocked ? 'blocked' : 'allowed';
+            
+            const item = document.createElement('div');
+            item.className = `feed-item ${cssClass}`;
+            
+            const details = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out`;
+            item.innerHTML = `<strong>[${timeLabel}]</strong> User: <em>${data.user_id}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
+            
+            feedDiv.prepend(item);
+            if (feedDiv.children.length > 50) {
+                feedDiv.removeChild(feedDiv.lastChild);
+            }
+        };
+    </script>
+</body>
+</html>

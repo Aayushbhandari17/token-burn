@@ -7,6 +7,7 @@ import json
 import time
 from redis.asyncio import Redis
 
+from fastapi.responses import FileResponse
 import backend.config as config
 from backend.config import TIERS, PRICE_PER_INPUT_TOKEN, PRICE_PER_OUTPUT_TOKEN
 from backend.mock_llm import mock_llm
@@ -14,8 +15,15 @@ from backend.defense.budget import BudgetEngine, BudgetExceeded
 from backend.defense.scorer import RiskScorer
 from backend.defense.policy import apply_policy, PolicyAction
 from backend.logger import RequestLogger
+from backend.dashboard import router as dashboard_router
 
 app = FastAPI(title="Token Burn Defense Prototype API")
+
+app.include_router(dashboard_router)
+
+@app.get("/")
+async def serve_dashboard():
+    return FileResponse("frontend/index.html")
 
 # Initialize global dependencies
 redis_client = Redis(host='localhost', port=6379, db=0)
@@ -209,6 +217,11 @@ if __name__ == "__main__":
 
         config.DEFENSES_ENABLED = True
         await cleanup()
+        req3 = ChatRequest(user_id=test_user, prompt="Please provide an exhaustive and comprehensive analysis.", tier="free", max_tokens=200)
+        res3 = await chat(req3)
+        assert res3["_debug_score"] == 5
+        assert res3["_debug_action"] == PolicyAction.REDUCE_50
+        print("Test 5 (Existing defense behaviors intact): Passed.")
         
         # Test 6: Pub/Sub Structured Event Published
         pubsub = redis_client.pubsub()
@@ -218,7 +231,6 @@ if __name__ == "__main__":
         await chat(req)
         
         msg = None
-        # Try fetching the message (might take a short cycle to arrive)
         for _ in range(10):
             msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
             if msg:
@@ -235,7 +247,45 @@ if __name__ == "__main__":
         print("Test 6 (Redis Pub/Sub Event Publishing): Passed.")
         
         await pubsub.unsubscribe("events")
+
+        # Test 7: Phase 9 SSE Stream test
+        # We can simulate connecting to the generator directly to see if it yields the data
+        from backend.dashboard import dashboard_stream
+        from fastapi import Request
+        class MockRequest:
+            async def is_disconnected(self):
+                return False
+
+        # Run the SSE generator briefly
+        response = await dashboard_stream(MockRequest())
+        gen = response.body_iterator
+        
+        # Schedule a chat request while waiting on the generator
+        async def background_chat():
+            await asyncio.sleep(0.5)
+            await chat(ChatRequest(user_id=test_user, prompt="SSE test", tier="free", max_tokens=50))
+            
+        asyncio.create_task(background_chat())
+        
+        # Wait for the event
+        sse_event = None
+        # We only wait for a max of 2 seconds (e.g. 20 iterations of 0.1s sleep)
+        for _ in range(20):
+            # The body iterator yields ServerSentEvent strings formatted as bytes? 
+            # In sse-starlette, it yields strings or bytes like 'data: {...}'
+            res = await anext(gen, None)
+            if res:
+                # `res` from sse_starlette is a ServerSentEvent object or string
+                res_str = str(res)
+                if "SSE test" in res_str or test_user in res_str:
+                    sse_event = res_str
+                    break
+        
+        assert sse_event is not None, "Did not receive SSE event from dashboard_stream"
+        assert '"user_id": "user_phase7_fix"' in sse_event or f'"user_id": "{test_user}"' in sse_event
+        print("Test 7 (Dashboard SSE connection and event delivery): Passed.")
+        
         await cleanup()
-        print("All Phase 7 (Fix) tests passed successfully.")
+        print("All Phase 7-9 tests passed successfully.")
         
     asyncio.run(run_tests())
