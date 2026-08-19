@@ -83,7 +83,7 @@ async def chat(request: ChatRequest):
     # Protected Flow: Phase 6+ Defense Pipeline
     # ---------------------------------------------------------
     is_flagged = await redis_client.get(f"scorer:flagged:{request.user_id}")
-    if is_flagged:
+    if is_flagged and tier_config["daily_cost_limit"] != math.inf:
         request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, 10, PolicyAction.HARD_DENY, "BLOCKED_FLAGGED")
         await publish_event({
             "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
@@ -92,33 +92,36 @@ async def chat(request: ChatRequest):
         })
         raise HTTPException(status_code=403, detail="Account temporarily flagged for suspicious activity.")
 
-    score, reasons, prompt_hash = await risk_scorer.evaluate(
-        user_id=request.user_id, prompt=request.prompt, input_tokens=input_tokens,
-        conversation_turn=request.conversation_turn, daily_cost_limit=tier_config["daily_cost_limit"]
-    )
-    
-    action, policy_max_tokens = apply_policy(score, requested_cap)
-    
-    if action == PolicyAction.HARD_DENY:
-        await redis_client.set(f"scorer:flagged:{request.user_id}", "1", ex=3600)
-        request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_HARD_DENY")
-        await publish_event({
-            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
-            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
-            "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_HARD_DENY"
-        })
-        raise HTTPException(status_code=403, detail="Request blocked (Score 10). Account flagged.")
-    elif action == PolicyAction.SOFT_DENY:
-        request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_SOFT_DENY")
-        await publish_event({
-            "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
-            "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
-            "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_SOFT_DENY"
-        })
-        raise HTTPException(status_code=429, detail="Request temporarily blocked (Score 8-9). Please try again later.")
+    if tier_config["daily_cost_limit"] != math.inf:
+        score, reasons, prompt_hash = await risk_scorer.evaluate(
+            user_id=request.user_id, prompt=request.prompt, input_tokens=input_tokens,
+            conversation_turn=request.conversation_turn, daily_cost_limit=tier_config["daily_cost_limit"]
+        )
         
-    requested_cap = policy_max_tokens
-    
+        action, policy_max_tokens = apply_policy(score, requested_cap)
+        
+        if action == PolicyAction.HARD_DENY:
+            await redis_client.set(f"scorer:flagged:{request.user_id}", "1", ex=3600)
+            request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_HARD_DENY")
+            await publish_event({
+                "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+                "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+                "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_HARD_DENY"
+            })
+            raise HTTPException(status_code=403, detail="Request blocked (Score 10). Account flagged.")
+        elif action == PolicyAction.SOFT_DENY:
+            request_logger.log_request(request.user_id, request.tier, input_tokens, 0, requested_cap, 0.0, score, action, "BLOCKED_SOFT_DENY")
+            await publish_event({
+                "timestamp": time.time(), "user_id": request.user_id, "tier": request.tier,
+                "input_tokens": input_tokens, "output_tokens": 0, "max_tokens": requested_cap,
+                "actual_cost": 0.0, "risk_score": score, "policy_action": action, "status": "BLOCKED_SOFT_DENY"
+            })
+            raise HTTPException(status_code=429, detail="Request temporarily blocked (Score 8-9). Please try again later.")
+            
+        requested_cap = policy_max_tokens
+    else:
+        score, action, reasons, prompt_hash = 0, PolicyAction.ALLOW, [], ""
+
     if tier_config["daily_cost_limit"] == math.inf:
         max_tokens = requested_cap
         cost_ceiling = 0.0
