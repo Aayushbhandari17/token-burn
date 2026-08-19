@@ -28,19 +28,19 @@
 
         <!-- Panel 2: Spend Velocity -->
         <div class="card">
-            <h2>Spend Velocity</h2>
+            <h2>Spend Velocity (Rolling $/min)</h2>
             <div class="chart-container"><canvas id="velocityChart"></canvas></div>
         </div>
 
         <!-- Panel 3: Cost Breakdown -->
         <div class="card">
-            <h2>Cost Breakdown (By Tier)</h2>
+            <h2>Cost Breakdown (Input vs Output)</h2>
             <div class="chart-container"><canvas id="breakdownChart"></canvas></div>
         </div>
 
         <!-- Panel 4: Request Heatmap -->
         <div class="card">
-            <h2>Request Heatmap (Scores)</h2>
+            <h2>Request Heatmap (Reqs/User/Min)</h2>
             <div class="chart-container"><canvas id="heatmapChart"></canvas></div>
         </div>
 
@@ -65,79 +65,115 @@
         // Data State
         let totalSpend = 0.0;
         let userSpend = {};
-        let tierSpend = { "free": 0.0, "pro": 0.0, "admin": 0.0 };
+        let costSplit = { input: 0.0, output: 0.0 };
+        let recentCosts = []; // For velocity tracking
         let actionFeedEmpty = true;
         let gaugesEmpty = true;
+        
+        // Attack-level threshold: 70% of $2.00 (free daily limit) over 1 hour = $1.40 / hour = ~$0.0233 / minute
+        const VELOCITY_THRESHOLD = 0.0233;
         
         // Setup Charts
         const velCtx = document.getElementById('velocityChart').getContext('2d');
         const velocityChart = new Chart(velCtx, {
             type: 'line',
-            data: { labels: [], datasets: [{ label: 'Cost / Event ($)', data: [], borderColor: '#2196f3', tension: 0.3, fill: true, backgroundColor: 'rgba(33, 150, 243, 0.1)' }] },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false } }, plugins: { legend: { display: false } } }
+            data: { 
+                labels: [], 
+                datasets: [
+                    { label: 'Spend Velocity ($/min)', data: [], borderColor: '#2196f3', tension: 0.3, fill: true, backgroundColor: 'rgba(33, 150, 243, 0.1)' },
+                    { label: 'Attack Threshold ($0.023/min)', data: [], borderColor: '#f44336', borderDash: [5, 5], pointRadius: 0, fill: false }
+                ] 
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { beginAtZero: true } }, plugins: { legend: { display: true, position: 'bottom' } } }
         });
 
         const breakCtx = document.getElementById('breakdownChart').getContext('2d');
         const breakdownChart = new Chart(breakCtx, {
             type: 'doughnut',
-            data: { labels: ['Free', 'Pro', 'Admin'], datasets: [{ data: [0, 0, 0], backgroundColor: ['#4caf50', '#ff9800', '#f44336'] }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: { labels: ['Input Cost', 'Output Cost'], datasets: [{ data: [0, 0], backgroundColor: ['#8e24aa', '#ffb300'] }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
         const heatCtx = document.getElementById('heatmapChart').getContext('2d');
         const heatmapChart = new Chart(heatCtx, {
             type: 'bar',
-            data: { labels: [], datasets: [{ label: 'Risk Score', data: [], backgroundColor: [] }] },
+            data: { labels: [], datasets: [] },
             options: { 
                 responsive: true, maintainAspectRatio: false, 
-                scales: { x: { display: false }, y: { min: 0, max: 10 } },
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
                 plugins: { legend: { display: false } }
             }
         });
+
+        // Background Velocity Updater (runs every 2 seconds to plot rolling 1-minute spend)
+        setInterval(() => {
+            const now = Date.now();
+            recentCosts = recentCosts.filter(e => now - e.timeMs <= 60000); // Keep only last 60 seconds
+            const sum60s = recentCosts.reduce((acc, curr) => acc + curr.cost, 0);
+            
+            const timeLabel = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            velocityChart.data.labels.push(timeLabel);
+            velocityChart.data.datasets[0].data.push(sum60s);
+            velocityChart.data.datasets[1].data.push(VELOCITY_THRESHOLD);
+            
+            if (velocityChart.data.labels.length > 30) {
+                velocityChart.data.labels.shift();
+                velocityChart.data.datasets[0].data.shift();
+                velocityChart.data.datasets[1].data.shift();
+            }
+            velocityChart.update();
+        }, 2000);
 
         // Initialize SSE Connection
         const evtSource = new EventSource("/dashboard/stream");
         evtSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             const cost = parseFloat(data.actual_cost) || 0.0;
-            const timeLabel = new Date(data.timestamp * 1000).toLocaleTimeString();
+            const timeLabelSec = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            const minuteStr = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
-            // 1. Update Global Spend
+            // 1. Update Global Spend & Velocity Tracking
             totalSpend += cost;
             document.getElementById('global-spend').innerText = '$' + totalSpend.toFixed(4);
+            recentCosts.push({ timeMs: Date.now(), cost: cost });
             
-            // 2. Update Velocity Chart (Rolling 50 events)
-            velocityChart.data.labels.push(timeLabel);
-            velocityChart.data.datasets[0].data.push(cost);
-            if (velocityChart.data.labels.length > 50) {
-                velocityChart.data.labels.shift();
-                velocityChart.data.datasets[0].data.shift();
-            }
-            velocityChart.update();
-            
-            // 3. Update Breakdown Chart
-            if (data.tier in tierSpend) {
-                tierSpend[data.tier] += cost;
-                breakdownChart.data.datasets[0].data = [tierSpend['free'], tierSpend['pro'], tierSpend['admin']];
+            // 2. Update Breakdown Chart (Input vs Output)
+            if (cost > 0) {
+                const inputCost = (data.input_tokens || 0) * 0.0000025; // PRICE_PER_INPUT_TOKEN
+                const outputCost = Math.max(0, cost - inputCost);
+                costSplit.input += inputCost;
+                costSplit.output += outputCost;
+                breakdownChart.data.datasets[0].data = [costSplit.input, costSplit.output];
                 breakdownChart.update();
             }
             
-            // 4. Update Heatmap (Risk Score)
-            heatmapChart.data.labels.push(timeLabel);
-            heatmapChart.data.datasets[0].data.push(data.risk_score);
-            let heatColor = '#4caf50'; // green
-            if (data.risk_score >= 8) heatColor = '#f44336'; // red
-            else if (data.risk_score >= 5) heatColor = '#ff9800'; // orange
-            heatmapChart.data.datasets[0].backgroundColor.push(heatColor);
-            
-            if (heatmapChart.data.labels.length > 50) {
-                heatmapChart.data.labels.shift();
-                heatmapChart.data.datasets[0].data.shift();
-                heatmapChart.data.datasets[0].backgroundColor.shift();
+            // 3. Update Heatmap (Reqs / User / Minute)
+            const minIndex = heatmapChart.data.labels.indexOf(minuteStr);
+            if (minIndex === -1) {
+                heatmapChart.data.labels.push(minuteStr);
+                heatmapChart.data.datasets.forEach(ds => ds.data.push(0));
+                // Keep last 10 minutes
+                if (heatmapChart.data.labels.length > 10) {
+                    heatmapChart.data.labels.shift();
+                    heatmapChart.data.datasets.forEach(ds => ds.data.shift());
+                }
             }
+            
+            let dataset = heatmapChart.data.datasets.find(ds => ds.label === data.user_id);
+            if (!dataset) {
+                // Generate a consistent deterministic color for the user
+                let hash = 0;
+                for (let i = 0; i < data.user_id.length; i++) hash = data.user_id.charCodeAt(i) + ((hash << 5) - hash);
+                const color = `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+                dataset = { label: data.user_id, data: Array(heatmapChart.data.labels.length).fill(0), backgroundColor: color };
+                heatmapChart.data.datasets.push(dataset);
+            }
+            
+            const currentMinIndex = heatmapChart.data.labels.indexOf(minuteStr);
+            dataset.data[currentMinIndex] += 1;
             heatmapChart.update();
             
-            // 5. Update User Gauges
+            // 4. Update User Gauges
             if (gaugesEmpty) { document.getElementById('user-gauges').innerHTML = ''; gaugesEmpty = false; }
             if (!userSpend[data.user_id]) userSpend[data.user_id] = 0;
             userSpend[data.user_id] += cost;
@@ -147,7 +183,7 @@
                 .map(([user, amt]) => `<div class="feed-item" style="display: flex; justify-content: space-between;"><strong>${user}</strong> <span>$${amt.toFixed(4)}</span></div>`)
                 .join('');
                 
-            // 6. Update Action Feed
+            // 5. Update Action Feed
             if (actionFeedEmpty) { document.getElementById('action-feed').innerHTML = ''; actionFeedEmpty = false; }
             const feedDiv = document.getElementById('action-feed');
             const isBlocked = data.status.includes('BLOCK') || data.status.includes('REJECT');
@@ -157,7 +193,7 @@
             item.className = `feed-item ${cssClass}`;
             
             const details = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out`;
-            item.innerHTML = `<strong>[${timeLabel}]</strong> User: <em>${data.user_id}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
+            item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${data.user_id}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
             
             feedDiv.prepend(item);
             if (feedDiv.children.length > 50) {
