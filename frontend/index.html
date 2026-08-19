@@ -19,6 +19,20 @@
 <body>
     <h1 style="color: #263238; margin-bottom: 20px;">Live Spend Dashboard</h1>
     <div class="grid">
+        <!-- Manual Chat Interface -->
+        <div class="card" style="grid-column: 1 / -1; background: #e3f2fd; border: 1px solid #bbdefb;">
+            <h2>Test LLM Request</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" id="chat-prompt" placeholder="Enter your prompt here... (e.g., 'Write a comprehensive and exhaustive analysis')" style="flex: 1; padding: 10px; border: 1px solid #b0bec5; border-radius: 6px; font-size: 1em;">
+                <select id="chat-tier" style="padding: 10px; border: 1px solid #b0bec5; border-radius: 6px; font-size: 1em;">
+                    <option value="free">Free Tier</option>
+                    <option value="admin">Admin Tier</option>
+                </select>
+                <button onclick="sendChat()" style="padding: 10px 24px; background: #1976d2; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1em;">Send</button>
+            </div>
+            <div id="chat-response" style="font-family: monospace; font-size: 0.95em; color: #546e7a; min-height: 20px;">Waiting for input...</div>
+        </div>
+
         <!-- Panel 1: Global Spend Meter -->
         <div class="card">
             <h2>Global Spend Meter</h2>
@@ -62,6 +76,43 @@
     </div>
 
     <script>
+        // Manual Chat Function
+        async function sendChat() {
+            const promptInput = document.getElementById('chat-prompt');
+            const tierSelect = document.getElementById('chat-tier');
+            const responseDiv = document.getElementById('chat-response');
+            
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+            
+            responseDiv.innerHTML = "Sending request to Mock LLM...";
+            responseDiv.style.color = "#1565c0";
+            
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: "demo_manual_user",
+                        tier: tierSelect.value,
+                        prompt: prompt
+                    })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    responseDiv.style.color = "#2e7d32";
+                    responseDiv.innerHTML = `<strong>Success (HTTP 200)</strong> - Tokens: ${data.input_tokens} In / ${data.output_tokens} Out | Cost: $${data.cost.total_cost.toFixed(5)}<br><span style="color:#546e7a;">Preview: "${data.text.substring(0, 80)}..."</span>`;
+                } else {
+                    responseDiv.style.color = "#c62828";
+                    responseDiv.innerHTML = `<strong>Blocked (HTTP ${res.status})</strong>: ${data.detail}`;
+                }
+            } catch (err) {
+                responseDiv.style.color = "#c62828";
+                responseDiv.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
+            }
+        }
+
         // Data State
         let totalSpend = 0.0;
         let userSpend = {};
