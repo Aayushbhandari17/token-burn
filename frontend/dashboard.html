@@ -113,7 +113,7 @@
         <div style="display: flex; align-items: center; gap: 15px;">
             <div id="attack-status" style="font-family: 'IBM Plex Mono', monospace; font-size: 0.8em; color: #991B1B; font-weight: bold; display: none; background: #FEF2F2; border: 1px solid #FCA5A5; padding: 8px 16px; border-radius: 6px; line-height: 1.4;"></div>
             
-            <a href="/" class="nav-btn" style="padding: 10px 18px; background: #FFFFFF; color: #0B1E36; border: 1px solid #E2E8F0; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; text-decoration: none; display: inline-block;">Open Chat</a>
+            <a href="/" class="nav-btn" style="padding: 10px 18px; background: #0B1E36; color: #FFFFFF; border: 1px solid #0B1E36; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; text-decoration: none; display: inline-block;">Open Chat</a>
             
             <div style="position: relative; display: inline-block;">
                 <button onclick="toggleDropdown()" style="padding: 10px 18px; background: #0B1E36; color: #FFFFFF; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px;">
@@ -269,17 +269,17 @@
             }
         }
 
-        // Data State
-        let totalSpend = 0.0;
-        let userSpend = {};
-        let costSplit = { input: 0.0, output: 0.0 };
-        let recentCosts = []; // For velocity tracking
+        // Data State - Restoring from sessionStorage to survive same-tab page switches
+        let totalSpend = parseFloat(sessionStorage.getItem('totalSpend')) || 0.0;
+        let userSpend = JSON.parse(sessionStorage.getItem('userSpend')) || {};
+        let costSplit = JSON.parse(sessionStorage.getItem('costSplit')) || { input: 0.0, output: 0.0 };
+        let recentCosts = JSON.parse(sessionStorage.getItem('recentCosts')) || []; 
         let actionFeedEmpty = true;
         let gaugesEmpty = true;
         
-        // Parallel streams for CostShield Impact Comparison
-        let protectedList = [];
-        let unprotectedList = [];
+        let protectedList = JSON.parse(sessionStorage.getItem('protectedList')) || [];
+        let unprotectedList = JSON.parse(sessionStorage.getItem('unprotectedList')) || [];
+        let eventHistory = JSON.parse(sessionStorage.getItem('eventHistory')) || [];
         
         const VELOCITY_THRESHOLD = 0.0233;
         
@@ -348,24 +348,15 @@
             }
         });
 
-        // Background Velocity Updater (runs every 2 seconds to plot rolling 1-minute spend)
-        setInterval(() => {
-            const now = Date.now();
-            recentCosts = recentCosts.filter(e => now - e.timeMs <= 60000); // Keep only last 60 seconds
-            const sum60s = recentCosts.reduce((acc, curr) => acc + curr.cost, 0);
-            
-            const timeLabel = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-            velocityChart.data.labels.push(timeLabel);
-            velocityChart.data.datasets[0].data.push(sum60s);
-            velocityChart.data.datasets[1].data.push(VELOCITY_THRESHOLD);
-            
-            if (velocityChart.data.labels.length > 30) {
-                velocityChart.data.labels.shift();
-                velocityChart.data.datasets[0].data.shift();
-                velocityChart.data.datasets[1].data.shift();
-            }
-            velocityChart.update();
-        }, 2000);
+        function saveState() {
+            sessionStorage.setItem('totalSpend', totalSpend.toString());
+            sessionStorage.setItem('userSpend', JSON.stringify(userSpend));
+            sessionStorage.setItem('costSplit', JSON.stringify(costSplit));
+            sessionStorage.setItem('recentCosts', JSON.stringify(recentCosts));
+            sessionStorage.setItem('protectedList', JSON.stringify(protectedList));
+            sessionStorage.setItem('unprotectedList', JSON.stringify(unprotectedList));
+            sessionStorage.setItem('eventHistory', JSON.stringify(eventHistory));
+        }
 
         function updateImpactChart() {
             let costPrevented = 0.0;
@@ -410,11 +401,112 @@
         // Tonal steps (ivory to gold to sapphire)
         const premiumPalette = ['#0B1E36', '#C5A059', '#64748B', '#047857', '#991B1B', '#E2E8F0'];
 
+        function loadHistory() {
+            document.getElementById('global-spend').innerText = '$' + totalSpend.toFixed(4);
+            
+            breakdownChart.data.datasets[0].data = [costSplit.input, costSplit.output];
+            breakdownChart.update();
+            
+            updateImpactChart();
+            
+            if (Object.keys(userSpend).length > 0) {
+                if (gaugesEmpty) { document.getElementById('user-gauges').innerHTML = ''; gaugesEmpty = false; }
+                const gaugesDiv = document.getElementById('user-gauges');
+                gaugesDiv.innerHTML = Object.entries(userSpend)
+                    .sort((a,b) => b[1] - a[1])
+                    .map(([user, amt]) => `<div class="feed-item" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0;">
+                        <strong>${user}</strong>
+                        <span style="color: ${amt > 1.6 ? '#991B1B' : (amt > 1.0 ? '#C5A059' : '#047857')}; font-weight: bold;">$${amt.toFixed(4)}</span>
+                    </div>`)
+                    .join('');
+            }
+            
+            if (eventHistory.length > 0) {
+                if (actionFeedEmpty) { document.getElementById('action-feed').innerHTML = ''; actionFeedEmpty = false; }
+                const feedDiv = document.getElementById('action-feed');
+                
+                eventHistory.forEach(data => {
+                    const timeLabelSec = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+                    const minuteStr = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    const cost = parseFloat(data.actual_cost) || 0.0;
+                    
+                    const minIndex = heatmapChart.data.labels.indexOf(minuteStr);
+                    if (minIndex === -1) {
+                        heatmapChart.data.labels.push(minuteStr);
+                        heatmapChart.data.datasets.forEach(ds => ds.data.push(0));
+                        if (heatmapChart.data.labels.length > 10) {
+                            heatmapChart.data.labels.shift();
+                            heatmapChart.data.datasets.forEach(ds => ds.data.shift());
+                        }
+                    }
+                    
+                    let dataset = heatmapChart.data.datasets.find(ds => ds.label === 'Protected' || ds.label === data.user_id);
+                    if (!dataset) {
+                        const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
+                        const color = premiumPalette[heatmapChart.data.datasets.length % premiumPalette.length];
+                        dataset = { label: displayName, data: Array(heatmapChart.data.labels.length).fill(0), backgroundColor: color };
+                        heatmapChart.data.datasets.push(dataset);
+                    }
+                    
+                    const currentMinIndex = heatmapChart.data.labels.indexOf(minuteStr);
+                    dataset.data[currentMinIndex] += 1;
+                    
+                    const isBlocked = data.status.includes('BLOCK') || data.status.includes('REJECT');
+                    const cssClass = isBlocked ? 'blocked' : 'allowed';
+                    
+                    const item = document.createElement('div');
+                    item.className = `feed-item ${cssClass}`;
+                    
+                    const actionText = data.policy_action;
+                    let actionColor = '#047857';
+                    if (actionText === 'HARD_DENY' || actionText === 'SOFT_DENY') actionColor = '#991B1B';
+                    else if (actionText.includes('REDUCE')) actionColor = '#C5A059';
+                    
+                    const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
+                    const details = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out`;
+                    item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${displayName}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong style="color: ${actionColor};">${actionText}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
+                    
+                    feedDiv.prepend(item);
+                });
+                
+                while (feedDiv.children.length > 50) {
+                    feedDiv.removeChild(feedDiv.lastChild);
+                }
+                heatmapChart.update();
+            }
+        }
+
+        // Initialize state from storage before SSE listening
+        loadHistory();
+
+        // Background Velocity Updater (runs every 2 seconds to plot rolling 1-minute spend)
+        setInterval(() => {
+            const now = Date.now();
+            recentCosts = recentCosts.filter(e => now - e.timeMs <= 60000); 
+            const sum60s = recentCosts.reduce((acc, curr) => acc + curr.cost, 0);
+            
+            const timeLabel = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+            velocityChart.data.labels.push(timeLabel);
+            velocityChart.data.datasets[0].data.push(sum60s);
+            velocityChart.data.datasets[1].data.push(VELOCITY_THRESHOLD);
+            
+            if (velocityChart.data.labels.length > 30) {
+                velocityChart.data.labels.shift();
+                velocityChart.data.datasets[0].data.shift();
+                velocityChart.data.datasets[1].data.shift();
+            }
+            velocityChart.update();
+            saveState();
+        }, 2000);
+
         // Initialize SSE Connection
         const evtSource = new EventSource("/dashboard/stream");
         evtSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             const cost = parseFloat(data.actual_cost) || 0.0;
+            
+            // Filter out chatbot-triggered events to prevent double counting since chat.html records them directly in sessionStorage
+            if (data.user_id === 'phase10_free' || data.user_id === 'phase10_admin') return;
             
             // Group cost streams for comparison logic first
             if (data.tier === 'free') {
@@ -427,6 +519,10 @@
             
             // Filter all remaining panels so they reflect only Protected tier data
             if (data.tier !== 'free') return;
+            
+            // Store event history payload safely
+            eventHistory.push(data);
+            if (eventHistory.length > 100) eventHistory.shift();
             
             const timeLabelSec = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
             const minuteStr = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -451,7 +547,6 @@
             if (minIndex === -1) {
                 heatmapChart.data.labels.push(minuteStr);
                 heatmapChart.data.datasets.forEach(ds => ds.data.push(0));
-                // Keep last 10 minutes
                 if (heatmapChart.data.labels.length > 10) {
                     heatmapChart.data.labels.shift();
                     heatmapChart.data.datasets.forEach(ds => ds.data.shift());
@@ -517,6 +612,9 @@
             if (feedDiv.children.length > 50) {
                 feedDiv.removeChild(feedDiv.lastChild);
             }
+            
+            // Persist updated metrics state
+            saveState();
         };
     </script>
 </body>

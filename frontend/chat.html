@@ -13,30 +13,30 @@
             justify-content: center;
             align-items: center;
             height: 100vh; 
-            background: #0B1E36; 
+            background: #F8F9FA; 
             color: #0B1E36; 
         }
         
-        /* Floating elevated chatbot window */
+        /* Floating elevated chatbot window with high-density glass styling */
         #chat-section { 
             width: 90%;
             max-width: 1200px;
             height: 85vh;
             display: flex; 
             flex-direction: column; 
-            background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background: rgba(255, 255, 255, 0.90); 
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border-radius: 12px;
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(11, 30, 54, 0.14);
+            box-shadow: 0 8px 24px rgba(11, 30, 54, 0.08);
             overflow: hidden;
         }
         
         .header { 
             padding: 20px; 
-            background: #FFFFFF; 
-            border-bottom: 1px solid #E2E8F0; 
+            background: rgba(255, 255, 255, 0.90); 
+            border-bottom: 1px solid rgba(11, 30, 54, 0.10); 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
@@ -69,14 +69,15 @@
             color: #0B1E36; 
             align-self: flex-start; 
             border-bottom-left-radius: 2px; 
-            border: 1px solid #E2E8F0;
+            border: 1px solid rgba(11, 30, 54, 0.14);
         }
         .msg.error { 
             background: #FEF2F2; 
-            color: #991B1B; 
+            color: #7F1D1D; 
             align-self: flex-start; 
             border-bottom-left-radius: 2px; 
-            border: 1px solid #FCA5A5; 
+            border: 1px solid #F87171; 
+            font-weight: 600;
         }
         
         .metric-group { 
@@ -91,13 +92,13 @@
             background: #F8F9FA; 
             padding: 3px 8px; 
             border-radius: 4px; 
-            font-weight: 500; 
+            font-weight: 600; 
             color: #0B1E36;
-            border: 1px solid #E2E8F0;
+            border: 1px solid rgba(11, 30, 54, 0.14);
         }
         .metric-badge.highlight { 
             background: #ECFDF5; 
-            color: #047857; 
+            color: #065F46; 
             border: 1px solid #A7F3D0;
         }
         .metric-badge.rose-highlight {
@@ -109,16 +110,18 @@
         input[type="text"] {
             font-family: 'Inter', sans-serif;
             font-size: 0.9em;
+            color: #0B1E36;
         }
         
-        .send-btn {
+        .send-btn, #toggle-comparison-btn {
             font-family: 'Inter', sans-serif;
             font-weight: 600;
-            transition: background 0.15s, color 0.15s;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
         }
-        .send-btn:hover {
+        .send-btn:hover, #toggle-comparison-btn:hover {
             background: #C5A059 !important;
             color: #FFFFFF !important;
+            border-color: #C5A059 !important;
         }
     </style>
 </head>
@@ -131,20 +134,20 @@
                 <h1>LLM Interface</h1>
                 <button id="toggle-comparison-btn" onclick="toggleComparison()" style="padding: 8px 16px; background: #0B1E36; color: #FFFFFF; border: 1px solid #0B1E36; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; transition: background 0.15s;">Compare Unprotected</button>
             </div>
-            <a href="/dashboard-ui" target="_blank" style="color: #0B1E36; text-decoration: none; font-weight: 600; font-size: 0.9em; border-bottom: 2px solid #C5A059; padding-bottom: 2px;">Open Dashboard ↗</a>
+            <a href="/dashboard-ui" style="color: #0B1E36; text-decoration: none; font-weight: 600; font-size: 0.9em; border-bottom: 2px solid #C5A059; padding-bottom: 2px;">Open Dashboard</a>
         </div>
         
         <!-- Side-by-Side Containers -->
         <div id="chat-container" style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box; justify-content: center; align-items: stretch; width: 100%;">
             
             <!-- Protected Column (default centered width) -->
-            <div id="free-column" style="flex: 1; max-width: 600px; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; transition: max-width 0.25s ease-in-out;">
-                <div style="background: #ECFDF5; color: #047857; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+            <div id="free-column" style="flex: 1; max-width: 600px; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid rgba(11, 30, 54, 0.14); border-radius: 8px; overflow: hidden; transition: max-width 0.25s ease-in-out; box-shadow: 0 8px 24px rgba(11, 30, 54, 0.04);">
+                <div style="background: #ECFDF5; color: #065F46; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid rgba(11, 30, 54, 0.10); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
                         <span style="letter-spacing: 0.5px; font-weight: 700;">PROTECTED</span>
-                        <span style="font-size: 0.75em; color: #047857; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Shield Active</span>
+                        <span style="font-size: 0.75em; color: #065F46; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Shield Active</span>
                     </div>
-                    <span id="free-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #047857; border: 1px solid #A7F3D0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
+                    <span id="free-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #065F46; border: 1px solid #A7F3D0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
                 </div>
                 
                 <div id="free-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #FAFBFB;">
@@ -152,30 +155,30 @@
                 </div>
                 
                 <!-- Protected Metrics Info -->
-                <div id="free-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0; font-size: 0.85em; color: #0B1E36; line-height: 1.5;">
+                <div id="free-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid rgba(11, 30, 54, 0.10); font-size: 0.85em; color: #0B1E36; line-height: 1.5;">
                     <div class="metric-group">
-                        <span>Cost: <strong id="free-metric-cost" style="color: #047857;">$0.00000</strong></span> |
-                        <span>Latency: <strong id="free-metric-latency" style="color: #C5A059;">0ms</strong></span> |
-                        <span>Tokens: <strong id="free-metric-tokens">0 In / 0 Out</strong></span>
+                        <span>Cost: <strong id="free-metric-cost" style="color: #065F46; font-family: 'IBM Plex Mono', monospace; font-weight: 700;">$0.00000</strong></span> |
+                        <span>Latency: <strong id="free-metric-latency" style="color: #C5A059; font-family: 'IBM Plex Mono', monospace; font-weight: 700;">0ms</strong></span> |
+                        <span>Tokens: <strong id="free-metric-tokens" style="font-family: 'IBM Plex Mono', monospace; font-weight: 700;">0 In / 0 Out</strong></span>
                     </div>
-                    <div style="margin-top: 5px; border-top: 1px dashed #E2E8F0; padding-top: 5px;" class="metric-group">
+                    <div style="margin-top: 5px; border-top: 1px dashed rgba(11, 30, 54, 0.10); padding-top: 5px;" class="metric-group">
                         <span class="metric-badge highlight" id="free-metric-score-badge">Score: <strong id="free-metric-score">0</strong></span>
                         <span class="metric-badge highlight">Action: <strong id="free-metric-action">ALLOW</strong></span>
-                        <span id="free-metric-reason" style="color: #991B1B; font-family: 'IBM Plex Mono', monospace; font-size: 0.95em;"></span>
+                        <span id="free-metric-reason" style="color: #991B1B; font-family: 'IBM Plex Mono', monospace; font-size: 0.95em; font-weight: 700;"></span>
                     </div>
                 </div>
                 
-                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0;">
+                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid rgba(11, 30, 54, 0.10);">
                     <div style="display: flex; gap: 10px;">
-                        <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; font-size: 0.9em; background: #F8F9FA; color: #0B1E36;">
-                        <button class="send-btn" onclick="sendChat()" style="padding: 8px 20px; background: #047857; color: #FFFFFF; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">Send</button>
+                        <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid rgba(11, 30, 54, 0.14); border-radius: 20px; outline: none; font-size: 0.9em; background: #F8F9FA; color: #0B1E36;">
+                        <button class="send-btn" onclick="sendChat()" style="padding: 8px 20px; background: #0B1E36; color: #FFFFFF; border: 1px solid #0B1E36; border-radius: 20px; cursor: pointer; font-weight: bold;">Send</button>
                     </div>
                 </div>
             </div>
 
             <!-- Unprotected Column (hidden by default, dusty rose theme) -->
-            <div id="admin-column" style="display: none; flex: 1; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border-color: #C98F98;">
-                <div style="background: #F8E7EA; color: #A85D68; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+            <div id="admin-column" style="display: none; flex: 1; flex-direction: column; background: #FFFFFF; border: 1px solid rgba(11, 30, 54, 0.14); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 24px rgba(11, 30, 54, 0.04); border-color: #C98F98;">
+                <div style="background: #F8E7EA; color: #A85D68; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid rgba(11, 30, 54, 0.10); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
                         <span style="letter-spacing: 0.5px; font-weight: 700;">UNPROTECTED</span>
                         <span style="font-size: 0.75em; color: #A85D68; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Baseline</span>
@@ -188,16 +191,16 @@
                 </div>
                 
                 <!-- Unprotected Metrics Info -->
-                <div id="admin-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0; font-size: 0.85em; color: #0B1E36; line-height: 1.5; min-height: 38px; display: flex; align-items: center;">
+                <div id="admin-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid rgba(11, 30, 54, 0.10); font-size: 0.85em; color: #0B1E36; line-height: 1.5; min-height: 38px; display: flex; align-items: center;">
                     <div class="metric-group">
-                        <span>Cost: <strong id="admin-metric-cost" style="color: #991B1B;">$0.00000</strong></span> |
-                        <span>Latency: <strong id="admin-metric-latency" style="color: #C5A059;">0ms</strong></span> |
-                        <span>Tokens: <strong id="admin-metric-tokens">0 In / 0 Out</strong></span>
+                        <span>Cost: <strong id="admin-metric-cost" style="color: #991B1B; font-family: 'IBM Plex Mono', monospace; font-weight: 700;">$0.00000</strong></span> |
+                        <span>Latency: <strong id="admin-metric-latency" style="color: #C5A059; font-family: 'IBM Plex Mono', monospace; font-weight: 700;">0ms</strong></span> |
+                        <span>Tokens: <strong id="admin-metric-tokens" style="font-family: 'IBM Plex Mono', monospace; font-weight: 700;">0 In / 0 Out</strong></span>
                     </div>
                 </div>
                 
-                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0;">
-                    <input type="text" id="admin-prompt-input" placeholder="[Mirrored Prompt]" readonly style="width: 100%; padding: 10px 15px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; background: #F8F9FA; color: #94A3B8; cursor: not-allowed; box-sizing: border-box; font-size: 0.9em;">
+                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid rgba(11, 30, 54, 0.10);">
+                    <input type="text" id="admin-prompt-input" placeholder="[Mirrored Prompt]" readonly style="width: 100%; padding: 10px 15px; border: 1px solid rgba(11, 30, 54, 0.14); border-radius: 20px; outline: none; background: #F8F9FA; color: #475569; cursor: not-allowed; box-sizing: border-box; font-size: 0.9em;">
                 </div>
             </div>
             
@@ -211,6 +214,8 @@
         const adminMessages = document.getElementById('admin-messages');
 
         let showUnprotected = false;
+        let freeHistory = JSON.parse(sessionStorage.getItem('freeHistory')) || [];
+        let adminHistory = JSON.parse(sessionStorage.getItem('adminHistory')) || [];
 
         function toggleComparison() {
             const btn = document.getElementById('toggle-comparison-btn');
@@ -226,6 +231,7 @@
                 freeCol.style.maxWidth = '600px';
                 btn.innerText = 'Compare Unprotected';
             }
+            saveMetrics();
         }
 
         // Synchronize inputs instantly
@@ -233,7 +239,61 @@
             adminInput.value = e.target.value;
         });
 
-        function appendMessage(container, text, type, meta = '') {
+        // State persistence helper routines
+        function saveCost(listKey, index, cost) {
+            let list = JSON.parse(sessionStorage.getItem(listKey)) || [];
+            list[index] = cost;
+            sessionStorage.setItem(listKey, JSON.stringify(list));
+        }
+
+        function saveMetrics() {
+            const metrics = {
+                freeCost: document.getElementById('free-metric-cost').innerText,
+                freeLatency: document.getElementById('free-metric-latency').innerText,
+                freeTokens: document.getElementById('free-metric-tokens').innerText,
+                freeScore: document.getElementById('free-metric-score').innerText,
+                freeScoreDisplay: document.getElementById('free-metric-score-badge').style.display,
+                freeAction: document.getElementById('free-metric-action').innerText,
+                freeReason: document.getElementById('free-metric-reason').innerText,
+                adminCost: document.getElementById('admin-metric-cost').innerText,
+                adminLatency: document.getElementById('admin-metric-latency').innerText,
+                adminTokens: document.getElementById('admin-metric-tokens').innerText,
+                showUnprotected: showUnprotected
+            };
+            sessionStorage.setItem('chatMetrics', JSON.stringify(metrics));
+        }
+
+        function recordEvent(user_id, tier, cost, status, input_tokens, output_tokens, max_tokens, risk_score, policy_action) {
+            let totalSpend = parseFloat(sessionStorage.getItem('totalSpend')) || 0.0;
+            let userSpend = JSON.parse(sessionStorage.getItem('userSpend')) || {};
+            let eventHistory = JSON.parse(sessionStorage.getItem('eventHistory')) || [];
+
+            totalSpend += cost;
+            sessionStorage.setItem('totalSpend', totalSpend.toString());
+
+            const displayName = user_id === 'phase10_free' ? 'Protected' : user_id;
+            if (!userSpend[displayName]) userSpend[displayName] = 0.0;
+            userSpend[displayName] += cost;
+            sessionStorage.setItem('userSpend', JSON.stringify(userSpend));
+
+            const eventData = {
+                timestamp: Date.now() / 1000,
+                user_id: user_id,
+                tier: tier,
+                input_tokens: input_tokens,
+                output_tokens: output_tokens,
+                max_tokens: max_tokens,
+                actual_cost: cost,
+                risk_score: risk_score,
+                policy_action: policy_action,
+                status: status
+            };
+            eventHistory.push(eventData);
+            if (eventHistory.length > 100) eventHistory.shift();
+            sessionStorage.setItem('eventHistory', JSON.stringify(eventHistory));
+        }
+
+        function appendMessage(container, text, type, meta = '', save = true) {
             const wrapper = document.createElement('div');
             wrapper.className = `msg ${type}`;
             wrapper.innerText = text;
@@ -248,12 +308,67 @@
             }
             container.appendChild(wrapper);
             container.scrollTop = container.scrollHeight;
+
+            if (save) {
+                const msgObj = { text, type, meta };
+                if (container.id === 'free-messages') {
+                    freeHistory.push(msgObj);
+                    sessionStorage.setItem('freeHistory', JSON.stringify(freeHistory));
+                } else if (container.id === 'admin-messages') {
+                    adminHistory.push(msgObj);
+                    sessionStorage.setItem('adminHistory', JSON.stringify(adminHistory));
+                }
+            }
             return wrapper;
+        }
+
+        function loadChatState() {
+            if (freeHistory.length > 0) {
+                freeMessages.innerHTML = '';
+                freeHistory.forEach(m => appendMessage(freeMessages, m.text, m.type, m.meta, false));
+            }
+            if (adminHistory.length > 0) {
+                adminMessages.innerHTML = '';
+                adminHistory.forEach(m => appendMessage(adminMessages, m.text, m.type, m.meta, false));
+            }
+
+            const metrics = JSON.parse(sessionStorage.getItem('chatMetrics'));
+            if (metrics) {
+                document.getElementById('free-metric-cost').innerText = metrics.freeCost;
+                document.getElementById('free-metric-latency').innerText = metrics.freeLatency;
+                document.getElementById('free-metric-tokens').innerText = metrics.freeTokens;
+                document.getElementById('free-metric-score').innerText = metrics.freeScore;
+                document.getElementById('free-metric-score-badge').style.display = metrics.freeScoreDisplay;
+                document.getElementById('free-metric-action').innerText = metrics.freeAction;
+                document.getElementById('free-metric-reason').innerText = metrics.freeReason;
+                document.getElementById('admin-metric-cost').innerText = metrics.adminCost;
+                document.getElementById('admin-metric-latency').innerText = metrics.adminLatency;
+                document.getElementById('admin-metric-tokens').innerText = metrics.adminTokens;
+                
+                showUnprotected = metrics.showUnprotected;
+                const btn = document.getElementById('toggle-comparison-btn');
+                const adminCol = document.getElementById('admin-column');
+                const freeCol = document.getElementById('free-column');
+                if (showUnprotected) {
+                    adminCol.style.display = 'flex';
+                    freeCol.style.maxWidth = 'none';
+                    btn.innerText = 'Hide Comparison';
+                } else {
+                    adminCol.style.display = 'none';
+                    freeCol.style.maxWidth = '600px';
+                    btn.innerText = 'Compare Unprotected';
+                }
+            }
         }
 
         async function sendChat() {
             const prompt = freeInput.value.trim();
             if (!prompt) return;
+            
+            // Allocate transaction request indices
+            const reqIndex = (JSON.parse(sessionStorage.getItem('protectedList')) || []).length;
+            saveCost('protectedList', reqIndex, 0.0);
+            saveCost('unprotectedList', reqIndex, 0.0);
             
             // Append users messages
             appendMessage(freeMessages, prompt, 'user');
@@ -261,10 +376,10 @@
             const freeBadge = document.getElementById('free-status-badge');
             freeBadge.innerText = "ANALYZING...";
             freeBadge.style.background = "#ECFDF5";
-            freeBadge.style.color = "#047857";
-            freeBadge.style.borderColor = "#047857";
+            freeBadge.style.color = "#065F46";
+            freeBadge.style.borderColor = "#065F46";
             
-            const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot");
+            const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot", "", false);
             
             freeInput.value = '';
             adminInput.value = '';
@@ -294,15 +409,15 @@
                         scoreBadge.style.display = 'inline-block';
                         document.getElementById('free-metric-score').innerText = score;
                         if (score >= 8) {
-                            scoreBadge.style.color = '#991B1B';
-                            scoreBadge.style.borderColor = '#FCA5A5';
+                            scoreBadge.style.color = '#7F1D1D';
+                            scoreBadge.style.borderColor = '#F87171';
                             scoreBadge.style.background = '#FEF2F2';
                         } else if (score >= 5) {
                             scoreBadge.style.color = '#C5A059';
                             scoreBadge.style.borderColor = '#F5E3C3';
                             scoreBadge.style.background = '#FDFBF7';
                         } else {
-                            scoreBadge.style.color = '#047857';
+                            scoreBadge.style.color = '#065F46';
                             scoreBadge.style.borderColor = '#A7F3D0';
                             scoreBadge.style.background = '#ECFDF5';
                         }
@@ -313,8 +428,13 @@
                     
                     freeBadge.innerText = "COMPLETED";
                     freeBadge.style.background = "#ECFDF5";
-                    freeBadge.style.color = "#047857";
+                    freeBadge.style.color = "#065F46";
                     freeBadge.style.borderColor = "#A7F3D0";
+                    
+                    // Persist metrics
+                    saveCost('protectedList', reqIndex, data.cost.total_cost);
+                    recordEvent("phase10_free", "free", data.cost.total_cost, "SUCCESS", data.input_tokens, data.output_tokens, data.max_tokens || 100, data._debug_score || 0, data._debug_action || "ALLOW");
+                    saveMetrics();
                 } else {
                     appendMessage(freeMessages, `Blocked: ${data.detail}`, 'error');
                     document.getElementById('free-metric-cost').innerText = "$0.00000";
@@ -329,16 +449,25 @@
                     
                     freeBadge.innerText = "BLOCKED";
                     freeBadge.style.background = "#FEF2F2";
-                    freeBadge.style.color = "#991B1B";
-                    freeBadge.style.borderColor = "#FCA5A5";
+                    freeBadge.style.color = "#7F1D1D";
+                    freeBadge.style.borderColor = "#F87171";
+                    
+                    // Persist blocked metrics
+                    saveCost('protectedList', reqIndex, 0.0);
+                    recordEvent("phase10_free", "free", 0.0, "BLOCKED", 0, 0, 100, 10, "HARD_DENY");
+                    saveMetrics();
                 }
             }).catch((err) => {
                 freeMessages.removeChild(freeLoadMsg);
                 appendMessage(freeMessages, `Network Error: ${err.message}`, 'error');
                 freeBadge.innerText = "ERROR";
                 freeBadge.style.background = "#FEF2F2";
-                freeBadge.style.color = "#991B1B";
-                freeBadge.style.borderColor = "#FCA5A5";
+                freeBadge.style.color = "#7F1D1D";
+                freeBadge.style.borderColor = "#F87171";
+                
+                saveCost('protectedList', reqIndex, 0.0);
+                recordEvent("phase10_free", "free", 0.0, "ERROR", 0, 0, 100, 0, "NONE");
+                saveMetrics();
             });
 
             // Handle Unprotected ONLY if comparison mode is enabled
@@ -351,7 +480,7 @@
                 adminBadge.style.color = "#0B1E36";
                 adminBadge.style.borderColor = "#E2E8F0";
                 
-                const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
+                const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot", "", false);
 
                 const adminPromise = fetch("/chat", {
                     method: "POST",
@@ -371,25 +500,37 @@
                         
                         adminBadge.innerText = "COMPLETED";
                         adminBadge.style.background = "#ECFDF5";
-                        adminBadge.style.color = "#047857";
+                        adminBadge.style.color = "#065F46";
                         adminBadge.style.borderColor = "#A7F3D0";
+                        
+                        saveCost('unprotectedList', reqIndex, data.cost.total_cost);
+                        saveMetrics();
                     } else {
                         appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
                         adminBadge.innerText = "FAILED";
                         adminBadge.style.background = "#FEF2F2";
-                        adminBadge.style.color = "#991B1B";
-                        adminBadge.style.borderColor = "#FCA5A5";
+                        adminBadge.style.color = "#7F1D1D";
+                        adminBadge.style.borderColor = "#F87171";
+                        
+                        saveCost('unprotectedList', reqIndex, 0.0);
+                        saveMetrics();
                     }
                 }).catch((err) => {
                     adminMessages.removeChild(adminLoadMsg);
                     appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
                     adminBadge.innerText = "ERROR";
                     adminBadge.style.background = "#FEF2F2";
-                    adminBadge.style.color = "#991B1B";
-                    adminBadge.style.borderColor = "#FCA5A5";
+                    adminBadge.style.color = "#7F1D1D";
+                    adminBadge.style.borderColor = "#F87171";
+                    
+                    saveCost('unprotectedList', reqIndex, 0.0);
+                    saveMetrics();
                 });
             }
         }
+
+        // Restore chat history and metrics upon page navigation
+        loadChatState();
     </script>
 </body>
 </html>
