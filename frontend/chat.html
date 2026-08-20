@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Burn | Chat Interface</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background: #f0f4f8; }
+        
+        /* Main Chat Area */
+        #chat-section { flex: 1; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .header { padding: 20px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { margin: 0; font-size: 1.5em; color: #333; }
+        
+        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; line-height: 1.4; word-wrap: break-word; }
+        .msg.user { background: #1976d2; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg.bot { background: #f1f3f4; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .msg.error { background: #ffebee; color: #c62828; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #ef9a9a; }
+        .msg-meta { font-size: 0.8em; margin-top: 5px; opacity: 0.8; }
+        
+        #input-area { padding: 20px; background: #fff; border-top: 1px solid #e0e0e0; }
+        .input-wrapper { display: flex; gap: 10px; }
+        #prompt-input { flex: 1; padding: 12px; border: 1px solid #cfd8dc; border-radius: 24px; font-size: 1em; outline: none; }
+        #prompt-input:focus { border-color: #1976d2; }
+        #tier-select { padding: 10px; border: 1px solid #cfd8dc; border-radius: 12px; outline: none; }
+        button.send-btn { padding: 10px 24px; background: #1976d2; color: white; border: none; border-radius: 24px; cursor: pointer; font-weight: bold; }
+        
+        /* Attack Sidebar */
+        #attack-sidebar { width: 300px; background: #263238; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        #attack-sidebar h2 { margin-top: 0; font-size: 1.2em; color: #eceff1; border-bottom: 1px solid #455a64; padding-bottom: 10px; }
+        .attack-btn { width: 100%; padding: 15px; margin-bottom: 10px; background: #37474f; color: white; border: 1px solid #546e7a; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: bold; text-align: left; transition: background 0.2s; }
+        .attack-btn:hover { background: #455a64; }
+        .attack-desc { font-size: 0.8em; color: #b0bec5; margin-top: 5px; font-weight: normal; }
+        
+        #attack-status { margin-top: auto; padding: 15px; background: #1c252a; border-radius: 8px; font-family: monospace; font-size: 0.85em; color: #4caf50; min-height: 50px; }
+    </style>
+</head>
+<body>
+
+    <!-- Main Chat Section -->
+    <div id="chat-section">
+        <div class="header">
+            <h1>LLM Interface</h1>
+            <a href="/dashboard-ui" target="_blank" style="color: #1976d2; text-decoration: none; font-weight: bold;">Open Dashboard ↗</a>
+        </div>
+        
+        <div id="messages">
+            <div class="msg bot">Hello! I am the Mock LLM. Send me a prompt, and the defense system will evaluate it before I respond.</div>
+        </div>
+        
+        <div id="input-area">
+            <div class="input-wrapper">
+                <select id="tier-select">
+                    <option value="free">Free Tier</option>
+                    <option value="admin">Admin Tier</option>
+                </select>
+                <input type="text" id="prompt-input" placeholder="Enter your prompt here..." onkeypress="if(event.key === 'Enter') sendChat()">
+                <button class="send-btn" onclick="sendChat()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attack Sidebar -->
+    <div id="attack-sidebar">
+        <!-- Budget Widget -->
+        <div id="budget-widget" style="background: #1c252a; padding: 15px; border-radius: 8px;">
+            <h3 style="margin: 0 0 10px 0; font-size: 1em; color: #eceff1; display: flex; justify-content: space-between;">
+                <span>Daily Budget</span>
+                <span id="budget-percent" style="color: #4caf50;">100%</span>
+            </h3>
+            <div style="background: #37474f; border-radius: 4px; height: 10px; width: 100%; overflow: hidden;">
+                <div id="budget-bar" style="background: #4caf50; height: 100%; width: 100%; transition: width 0.3s;"></div>
+            </div>
+            <div id="budget-text" style="font-size: 0.85em; color: #b0bec5; margin-top: 8px;">Loading...</div>
+        </div>
+        
+        <h2>Simulate Attacks</h2>
+        
+        <button class="attack-btn" onclick="triggerAttack('naive')">
+            1. Naive Output Maximizer
+            <div class="attack-desc">Fires 50 verbose prompts concurrently.</div>
+        </button>
+        
+        <button class="attack-btn" onclick="triggerAttack('context')">
+            2. Context Stuffer
+            <div class="attack-desc">Progressively appends 1000 words to blow input budget.</div>
+        </button>
+        
+        <button class="attack-btn" onclick="triggerAttack('sybil')">
+            3. Sybil Burst
+            <div class="attack-desc">10 users firing 15 requests concurrently.</div>
+        </button>
+        
+        <div id="attack-status">System Ready. Click an attack to launch it in the background.</div>
+    </div>
+
+    <script>
+        const messagesDiv = document.getElementById('messages');
+        const promptInput = document.getElementById('prompt-input');
+        const tierSelect = document.getElementById('tier-select');
+        const attackStatus = document.getElementById('attack-status');
+
+        async function updateBudgetMeter() {
+            try {
+                const tier = tierSelect.value;
+                const res = await fetch(`/api/budget/demo_manual_user/${tier}`);
+                const data = await res.json();
+                
+                const percentSpan = document.getElementById('budget-percent');
+                const bar = document.getElementById('budget-bar');
+                const text = document.getElementById('budget-text');
+                
+                if (data.limit_usd === "Unlimited") {
+                    percentSpan.innerText = "∞";
+                    bar.style.width = "100%";
+                    bar.style.background = "#2196f3";
+                    percentSpan.style.color = "#2196f3";
+                    text.innerText = "Unlimited (Admin Tier)";
+                } else {
+                    const p = Math.max(0, Math.min(100, data.percentage));
+                    percentSpan.innerText = `${p.toFixed(1)}%`;
+                    bar.style.width = `${p}%`;
+                    
+                    if (p > 50) { bar.style.background = "#4caf50"; percentSpan.style.color = "#4caf50"; }
+                    else if (p > 20) { bar.style.background = "#ff9800"; percentSpan.style.color = "#ff9800"; }
+                    else { bar.style.background = "#f44336"; percentSpan.style.color = "#f44336"; }
+                    
+                    text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
+                }
+            } catch (err) {
+                console.error("Failed to fetch budget:", err);
+            }
+        }
+        
+        // Update on startup and when tier changes
+        window.onload = updateBudgetMeter;
+        tierSelect.addEventListener('change', updateBudgetMeter);
+
+        function appendMessage(text, type, meta = '') {
+            const wrapper = document.createElement('div');
+            wrapper.className = `msg ${type}`;
+            wrapper.innerText = text;
+            if (meta) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'msg-meta';
+                metaDiv.innerHTML = meta;
+                wrapper.appendChild(metaDiv);
+            }
+            messagesDiv.appendChild(wrapper);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function sendChat() {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+            
+            appendMessage(prompt, 'user');
+            promptInput.value = '';
+            
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        user_id: "demo_manual_user",
+                        tier: tierSelect.value,
+                        prompt: prompt
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    const meta = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out | Cost: $${data.cost.total_cost.toFixed(5)}`;
+                    appendMessage(data.text, 'bot', meta);
+                } else {
+                    const meta = `HTTP ${res.status}`;
+                    appendMessage(`Blocked: ${data.detail}`, 'error', meta);
+                }
+                
+                // Refresh the budget meter dynamically
+                await updateBudgetMeter();
+            } catch (err) {
+                appendMessage(`Network Error: ${err.message}`, 'error');
+            }
+        }
+
+        async function triggerAttack(attackName) {
+            attackStatus.style.color = "#ffeb3b";
+            attackStatus.innerText = `Launching ${attackName} attack in background...\nCheck Dashboard!`;
+            
+            try {
+                const res = await fetch(`/api/attack/${attackName}`, { method: "POST" });
+                const data = await res.json();
+                if (res.ok) {
+                    attackStatus.style.color = "#4caf50";
+                    attackStatus.innerText = `[Success] ${data.status}\nWatch the Dashboard for live defenses.`;
+                } else {
+                    attackStatus.style.color = "#f44336";
+                    attackStatus.innerText = `[Error] Failed to launch: ${data.detail || res.statusText}`;
+                }
+            } catch (err) {
+                attackStatus.style.color = "#f44336";
+                attackStatus.innerText = `[Error] ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
