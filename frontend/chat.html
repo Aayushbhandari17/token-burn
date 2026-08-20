@@ -15,14 +15,8 @@
         .msg.bot { background: #f1f3f4; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
         .msg.error { background: #ffebee; color: #c62828; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #ef9a9a; }
         
-        /* Attack Sidebar */
+        /* Sidebar container to hold Free Daily Budget */
         #attack-sidebar { width: 300px; background: #263238; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
-        #attack-sidebar h2 { margin-top: 0; font-size: 1.2em; color: #eceff1; border-bottom: 1px solid #455a64; padding-bottom: 10px; }
-        .attack-btn { width: 100%; padding: 12px; margin-bottom: 8px; background: #37474f; color: white; border: 1px solid #546e7a; border-radius: 8px; cursor: pointer; font-size: 0.95em; font-weight: bold; text-align: left; transition: background 0.2s; }
-        .attack-btn:hover { background: #455a64; }
-        .attack-desc { font-size: 0.75em; color: #b0bec5; margin-top: 3px; font-weight: normal; }
-        
-        #attack-status { margin-top: auto; padding: 15px; background: #1c252a; border-radius: 8px; font-family: monospace; font-size: 0.85em; color: #4caf50; min-height: 50px; }
         
         .metric-group { display: flex; flex-wrap: wrap; gap: 10px; }
         .metric-badge { background: #e0e0e0; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
@@ -63,7 +57,7 @@
                         <span>Tokens: <strong id="free-metric-tokens">0 In / 0 Out</strong></span>
                     </div>
                     <div style="margin-top: 5px; border-top: 1px dashed #cfd8dc; padding-top: 5px;" class="metric-group">
-                        <span class="metric-badge highlight">Score: <strong id="free-metric-score">0</strong></span>
+                        <span class="metric-badge highlight" id="free-metric-score-badge">Score: <strong id="free-metric-score">0</strong></span>
                         <span class="metric-badge highlight">Action: <strong id="free-metric-action">ALLOW</strong></span>
                         <span id="free-metric-reason" style="color: #757575;"></span>
                     </div>
@@ -108,7 +102,7 @@
         </div>
     </div>
 
-    <!-- Attack Sidebar -->
+    <!-- Sidebar to hold budget widgets -->
     <div id="attack-sidebar">
         <!-- Budget Widget -->
         <div id="budget-widget" style="background: #1c252a; padding: 15px; border-radius: 8px;">
@@ -121,25 +115,6 @@
             </div>
             <div id="budget-text" style="font-size: 0.85em; color: #b0bec5; margin-top: 8px;">Loading...</div>
         </div>
-        
-        <h2>Simulate Attacks</h2>
-        
-        <button class="attack-btn" onclick="triggerAttack('naive')">
-            1. Naive Output Maximizer
-            <div class="attack-desc">Fires 50 verbose prompts concurrently.</div>
-        </button>
-        
-        <button class="attack-btn" onclick="triggerAttack('context')">
-            2. Context Stuffer
-            <div class="attack-desc">Progressively appends 1000 words to blow input budget.</div>
-        </button>
-        
-        <button class="attack-btn" onclick="triggerAttack('sybil')">
-            3. Sybil Burst
-            <div class="attack-desc">10 users firing 15 requests concurrently.</div>
-        </button>
-        
-        <div id="attack-status">System Ready. Click an attack to launch it in the background.</div>
     </div>
 
     <script>
@@ -147,7 +122,6 @@
         const adminInput = document.getElementById('admin-prompt-input');
         const freeMessages = document.getElementById('free-messages');
         const adminMessages = document.getElementById('admin-messages');
-        const attackStatus = document.getElementById('attack-status');
 
         // Synchronize inputs instantly
         freeInput.addEventListener('input', (e) => {
@@ -248,7 +222,15 @@
                     document.getElementById('free-metric-latency').innerText = `${data.latency_ms}ms`;
                     document.getElementById('free-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
                     
-                    document.getElementById('free-metric-score').innerText = data._debug_score;
+                    const score = data._debug_score;
+                    const scoreBadge = document.getElementById('free-metric-score-badge');
+                    if (score === "N/A" || score === null || score === undefined) {
+                        scoreBadge.style.display = 'none';
+                    } else {
+                        scoreBadge.style.display = 'inline-block';
+                        document.getElementById('free-metric-score').innerText = score;
+                    }
+                    
                     document.getElementById('free-metric-action').innerText = data._debug_action;
                     document.getElementById('free-metric-reason').innerText = data._debug_reasons.length > 0 ? `(${data._debug_reasons.join(', ')})` : '';
                     
@@ -261,7 +243,9 @@
                     document.getElementById('free-metric-latency').innerText = "0ms";
                     document.getElementById('free-metric-tokens').innerText = "0 In / 0 Out";
                     
-                    document.getElementById('free-metric-score').innerText = "N/A";
+                    // Suppress Score info when N/A
+                    document.getElementById('free-metric-score-badge').style.display = 'none';
+                    
                     document.getElementById('free-metric-action').innerText = "DENIED";
                     document.getElementById('free-metric-reason').innerText = `(${data.detail})`;
                     
@@ -305,26 +289,6 @@
                 adminBadge.style.background = "#ffcdd2";
                 adminBadge.style.color = "#c62828";
             });
-        }
-
-        async function triggerAttack(attackName) {
-            attackStatus.style.color = "#ffeb3b";
-            attackStatus.innerText = `Launching ${attackName} attack in background...\nCheck Dashboard!`;
-            
-            try {
-                const res = await fetch(`/api/attack/${attackName}`, { method: "POST" });
-                const data = await res.json();
-                if (res.ok) {
-                    attackStatus.style.color = "#4caf50";
-                    attackStatus.innerText = `[Success] ${data.status}\nWatch the Dashboard for live defenses.`;
-                } else {
-                    attackStatus.style.color = "#f44336";
-                    attackStatus.innerText = `[Error] Failed to launch: ${data.detail || res.statusText}`;
-                }
-            } catch (err) {
-                attackStatus.style.color = "#f44336";
-                attackStatus.innerText = `[Error] ${err.message}`;
-            }
         }
     </script>
 </body>
