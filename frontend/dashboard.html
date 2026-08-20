@@ -14,25 +14,22 @@
         h2 { margin-top: 0; font-size: 1.1em; color: #546e7a; text-transform: uppercase; letter-spacing: 0.5px; }
         .big-number { font-size: 3em; font-weight: bold; color: #263238; }
         .chart-container { position: relative; height: 250px; width: 100%; }
+        
+        /* Maximize UI CSS */
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+        .card-header h2 { margin: 0; }
+        .max-btn { background: none; border: none; cursor: pointer; color: #90a4ae; font-size: 1.2em; transition: color 0.2s; padding: 0; line-height: 1; }
+        .max-btn:hover { color: #1976d2; }
+        .card.maximized { position: fixed; top: 5%; left: 5%; width: 90%; height: 90%; z-index: 1000; display: flex; flex-direction: column; box-sizing: border-box; }
+        .card.maximized .chart-container, .card.maximized .feed { height: 100%; flex: 1; max-height: none; }
+        #backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; backdrop-filter: blur(2px); }
+        #backdrop.active { display: block; }
     </style>
 </head>
 <body>
+    <div id="backdrop" onclick="closeMaximized()"></div>
     <h1 style="color: #263238; margin-bottom: 20px;">Live Spend Dashboard</h1>
     <div class="grid">
-        <!-- Manual Chat Interface -->
-        <div class="card" style="grid-column: 1 / -1; background: #e3f2fd; border: 1px solid #bbdefb;">
-            <h2>Test LLM Request</h2>
-            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" id="chat-prompt" placeholder="Enter your prompt here... (e.g., 'Write a comprehensive and exhaustive analysis')" style="flex: 1; padding: 10px; border: 1px solid #b0bec5; border-radius: 6px; font-size: 1em;">
-                <select id="chat-tier" style="padding: 10px; border: 1px solid #b0bec5; border-radius: 6px; font-size: 1em;">
-                    <option value="free">Free Tier</option>
-                    <option value="admin">Admin Tier</option>
-                </select>
-                <button onclick="sendChat()" style="padding: 10px 24px; background: #1976d2; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1em;">Send</button>
-            </div>
-            <div id="chat-response" style="font-family: monospace; font-size: 0.95em; color: #546e7a; min-height: 20px;">Waiting for input...</div>
-        </div>
-
         <!-- Panel 1: Global Spend Meter -->
         <div class="card">
             <h2>Global Spend Meter</h2>
@@ -42,25 +39,37 @@
 
         <!-- Panel 2: Spend Velocity -->
         <div class="card">
-            <h2>Spend Velocity (Rolling $/min)</h2>
+            <div class="card-header">
+                <h2>Spend Velocity (Rolling $/min)</h2>
+                <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
+            </div>
             <div class="chart-container"><canvas id="velocityChart"></canvas></div>
         </div>
 
         <!-- Panel 3: Cost Breakdown -->
         <div class="card">
-            <h2>Cost Breakdown (Input vs Output)</h2>
+            <div class="card-header">
+                <h2>Cost Breakdown (Input vs Output)</h2>
+                <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
+            </div>
             <div class="chart-container"><canvas id="breakdownChart"></canvas></div>
         </div>
 
         <!-- Panel 4: Request Heatmap -->
         <div class="card">
-            <h2>Request Heatmap (Reqs/User/Min)</h2>
+            <div class="card-header">
+                <h2>Request Heatmap (Reqs/User/Min)</h2>
+                <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
+            </div>
             <div class="chart-container"><canvas id="heatmapChart"></canvas></div>
         </div>
 
         <!-- Panel 5: Per-user Budget Gauges -->
         <div class="card">
-            <h2>Per-user Budget Gauges</h2>
+            <div class="card-header">
+                <h2>Per-user Budget Gauges</h2>
+                <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
+            </div>
             <div class="feed" id="user-gauges">
                 <div style="color: #90a4ae; padding: 10px;">Awaiting data...</div>
             </div>
@@ -68,7 +77,10 @@
 
         <!-- Panel 6: Defense Action Feed -->
         <div class="card" style="grid-column: 1 / -1;">
-            <h2>Defense Action Feed</h2>
+            <div class="card-header">
+                <h2>Defense Action Feed</h2>
+                <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
+            </div>
             <div class="feed" id="action-feed">
                 <div style="color: #90a4ae; padding: 10px;">Listening for live events...</div>
             </div>
@@ -76,40 +88,27 @@
     </div>
 
     <script>
-        // Manual Chat Function
-        async function sendChat() {
-            const promptInput = document.getElementById('chat-prompt');
-            const tierSelect = document.getElementById('chat-tier');
-            const responseDiv = document.getElementById('chat-response');
-            
-            const prompt = promptInput.value.trim();
-            if (!prompt) return;
-            
-            responseDiv.innerHTML = "Sending request to Mock LLM...";
-            responseDiv.style.color = "#1565c0";
-            
-            try {
-                const res = await fetch("/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        user_id: "demo_manual_user",
-                        tier: tierSelect.value,
-                        prompt: prompt
-                    })
-                });
-                
-                const data = await res.json();
-                if (res.ok) {
-                    responseDiv.style.color = "#2e7d32";
-                    responseDiv.innerHTML = `<strong>Success (HTTP 200)</strong> - Tokens: ${data.input_tokens} In / ${data.output_tokens} Out | Cost: $${data.cost.total_cost.toFixed(5)}<br><span style="color:#546e7a;">Preview: "${data.text.substring(0, 80)}..."</span>`;
-                } else {
-                    responseDiv.style.color = "#c62828";
-                    responseDiv.innerHTML = `<strong>Blocked (HTTP ${res.status})</strong>: ${data.detail}`;
-                }
-            } catch (err) {
-                responseDiv.style.color = "#c62828";
-                responseDiv.innerHTML = `<strong>Network Error:</strong> ${err.message}`;
+        // Maximize Functionality
+        let currentMaximized = null;
+        function toggleMaximize(btn) {
+            const card = btn.closest('.card');
+            const backdrop = document.getElementById('backdrop');
+            if (card.classList.contains('maximized')) {
+                card.classList.remove('maximized');
+                backdrop.classList.remove('active');
+                btn.innerText = '⛶';
+                currentMaximized = null;
+            } else {
+                card.classList.add('maximized');
+                backdrop.classList.add('active');
+                btn.innerText = '✖';
+                currentMaximized = card;
+            }
+        }
+        function closeMaximized() {
+            if (currentMaximized) {
+                const btn = currentMaximized.querySelector('.max-btn');
+                if (btn) toggleMaximize(btn);
             }
         }
 

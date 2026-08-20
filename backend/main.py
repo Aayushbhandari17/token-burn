@@ -7,6 +7,9 @@ import json
 import time
 from redis.asyncio import Redis
 
+import subprocess
+import os
+
 from fastapi.responses import FileResponse
 import backend.config as config
 from backend.config import TIERS, PRICE_PER_INPUT_TOKEN, PRICE_PER_OUTPUT_TOKEN
@@ -22,8 +25,52 @@ app = FastAPI(title="Token Burn Defense Prototype API")
 app.include_router(dashboard_router)
 
 @app.get("/")
+async def serve_chat():
+    return FileResponse("frontend/chat.html")
+
+@app.get("/dashboard-ui")
 async def serve_dashboard():
-    return FileResponse("frontend/index.html")
+    return FileResponse("frontend/dashboard.html")
+
+@app.post("/api/attack/{attack_name}")
+async def trigger_attack(attack_name: str):
+    valid_attacks = {
+        "naive": "attacks/attack_naive.py",
+        "context": "attacks/attack_context.py",
+        "sybil": "attacks/attack_sybil.py"
+    }
+    if attack_name not in valid_attacks:
+        raise HTTPException(status_code=400, detail="Invalid attack name")
+        
+    script_path = valid_attacks[attack_name]
+    
+    # Run the attack script in the background
+    await asyncio.create_subprocess_exec(
+        "python3", script_path,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    return {"status": f"'{attack_name}' attack launched successfully."}
+
+@app.get("/api/budget/{user_id}/{tier}")
+async def get_budget_status(user_id: str, tier: str):
+    import math
+    if tier not in TIERS:
+        raise HTTPException(status_code=400, detail="Invalid tier")
+        
+    remaining_usd = await budget_engine.get_remaining_daily_cost(user_id, tier)
+    daily_limit = TIERS[tier]["daily_cost_limit"]
+    
+    if daily_limit == math.inf:
+        return {"remaining_usd": "Unlimited", "limit_usd": "Unlimited", "percentage": 100}
+        
+    percentage = (remaining_usd / daily_limit) * 100.0
+    
+    return {
+        "remaining_usd": remaining_usd,
+        "limit_usd": daily_limit,
+        "percentage": percentage
+    }
 
 # Initialize global dependencies
 redis_client = Redis(host='localhost', port=6379, db=0)
