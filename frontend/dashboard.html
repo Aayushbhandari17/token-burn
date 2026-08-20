@@ -4,47 +4,123 @@
     <title>Token Burn | Live Spend Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 20px; background: #eceff1; }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 20px; 
+            background: #0B132B; 
+            color: #E2E8F0;
+        }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .feed { max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 0.85em; }
-        .feed-item { padding: 8px; border-bottom: 1px solid #f0f0f0; border-radius: 4px; margin-bottom: 4px; }
-        .blocked { background: #ffebee; color: #c62828; border-left: 4px solid #c62828; }
-        .allowed { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #2e7d32; }
-        h2 { margin-top: 0; font-size: 1.1em; color: #546e7a; text-transform: uppercase; letter-spacing: 0.5px; }
-        .big-number { font-size: 3em; font-weight: bold; color: #263238; }
+        .card { 
+            background: #1E293B; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); 
+            border: 1px solid #334155;
+        }
+        .feed { 
+            max-height: 250px; 
+            overflow-y: auto; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 0.85em; 
+        }
+        .feed-item { 
+            padding: 8px; 
+            border-bottom: 1px solid #334155; 
+            border-radius: 4px; 
+            margin-bottom: 4px; 
+            line-height: 1.4;
+            color: #E2E8F0;
+        }
+        
+        /* Semantic States using Muted Cyber Ops Colors */
+        .blocked { 
+            background: #2D1F29; 
+            color: #FF4D4D; 
+            border-left: 4px solid #FF4D4D; 
+        }
+        .allowed { 
+            background: #142F26; 
+            color: #10B981; 
+            border-left: 4px solid #10B981; 
+        }
+        
+        h2 { 
+            margin-top: 0; 
+            font-size: 0.95em; 
+            color: #94A3B8; 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+            font-weight: 700;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        .big-number { 
+            font-size: 3.5em; 
+            font-weight: 700; 
+            color: #E2E8F0; 
+            font-family: 'JetBrains Mono', monospace;
+        }
         .chart-container { position: relative; height: 250px; width: 100%; }
         
         /* Maximize UI CSS */
         .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
         .card-header h2 { margin: 0; }
-        .max-btn { background: none; border: none; cursor: pointer; color: #90a4ae; font-size: 1.2em; transition: color 0.2s; padding: 0; line-height: 1; }
-        .max-btn:hover { color: #1976d2; }
+        .max-btn { background: none; border: none; cursor: pointer; color: #64748B; font-size: 1.2em; transition: color 0.15s; padding: 0; line-height: 1; }
+        .max-btn:hover { color: #00F5D4; }
         .card.maximized { position: fixed; top: 5%; left: 5%; width: 90%; height: 90%; z-index: 1000; display: flex; flex-direction: column; box-sizing: border-box; }
         .card.maximized .chart-container, .card.maximized .feed { height: 100%; flex: 1; max-height: none; }
-        #backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; backdrop-filter: blur(2px); }
+        #backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 19, 43, 0.85); z-index: 999; backdrop-filter: blur(4px); }
         #backdrop.active { display: block; }
         
-        #attack-dropdown a:hover { background-color: #f5f5f5; color: #1976d2; }
+        /* Dropdown custom styling */
+        #attack-dropdown a {
+            font-family: 'Inter', sans-serif;
+        }
+        #attack-dropdown a:hover { 
+            background-color: #334155; 
+            color: #00F5D4; 
+        }
+        
+        button {
+            font-family: 'Space Grotesk', sans-serif;
+            transition: background 0.15s, color 0.15s;
+        }
+        button:hover {
+            background: #00F5D4 !important;
+            color: #0B132B !important;
+            border-color: #00F5D4 !important;
+        }
     </style>
 </head>
 <body>
     <div id="backdrop" onclick="closeMaximized()"></div>
     
     <!-- Dashboard Header Area with Simulator Dropdown -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1 style="color: #263238; margin: 0;">Live Spend Dashboard</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 1px solid #334155; padding-bottom: 15px;">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <div id="attack-status" style="font-size: 0.85em; color: #c62828; font-weight: bold; display: none; background: #ffebee; border: 1px solid #ffcdd2; padding: 6px 12px; border-radius: 8px; line-height: 1.3;"></div>
+            <h1 style="color: #E2E8F0; margin: 0; font-size: 1.8em; font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 0.5px;">🛡 COSTSHIELD</h1>
+            <div style="display: flex; gap: 8px; font-size: 0.75em; font-weight: 600; font-family: 'Space Grotesk', sans-serif;">
+                <span style="background: #142F26; color: #10B981; border: 1px solid #10B981; padding: 2px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10B981;"></span> PROTECTION ACTIVE
+                </span>
+                <span style="background: #112A34; color: #00F5D4; border: 1px solid #00F5D4; padding: 2px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #00F5D4; box-shadow: 0 0 8px #00F5D4;"></span> LIVE
+                </span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div id="attack-status" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8em; color: #FF4D4D; font-weight: bold; display: none; background: #2D1F29; border: 1px solid #FF4D4D; padding: 8px 16px; border-radius: 6px; line-height: 1.4;"></div>
             
             <div style="position: relative; display: inline-block;">
-                <button onclick="toggleDropdown()" style="padding: 10px 16px; background: #263238; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px;">
+                <button onclick="toggleDropdown()" style="padding: 10px 18px; background: #1E293B; color: #00F5D4; border: 1px solid #334155; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px;">
                     🧪 ATTACK SIMULATOR ▾
                 </button>
-                <div id="attack-dropdown" style="display: none; position: absolute; right: 0; top: 110%; background: #ffffff; min-width: 240px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); border-radius: 8px; z-index: 1001; border: 1px solid #cfd8dc; overflow: hidden;">
-                    <a href="#" onclick="runAttack('naive', 'Naive Output Maximizer')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #eceff1; transition: background 0.2s;">⚡ Naive Output Maximizer</a>
-                    <a href="#" onclick="runAttack('context', 'Context Stuffer')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #eceff1; transition: background 0.2s;">📚 Context Stuffer</a>
-                    <a href="#" onclick="runAttack('sybil', 'Sybil Burst')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; transition: background 0.2s;">👥 Sybil Burst</a>
+                <div id="attack-dropdown" style="display: none; position: absolute; right: 0; top: 110%; background: #1E293B; min-width: 240px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border-radius: 6px; z-index: 1001; border: 1px solid #334155; overflow: hidden;">
+                    <a href="#" onclick="runAttack('naive', 'Naive Output Maximizer')" style="color: #E2E8F0; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #334155; transition: background 0.15s;">⚡ Naive Output Maximizer</a>
+                    <a href="#" onclick="runAttack('context', 'Context Stuffer')" style="color: #E2E8F0; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #334155; transition: background 0.15s;">📚 Context Stuffer</a>
+                    <a href="#" onclick="runAttack('sybil', 'Sybil Burst')" style="color: #E2E8F0; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; transition: background 0.15s;">👥 Sybil Burst</a>
                 </div>
             </div>
         </div>
@@ -53,14 +129,14 @@
     <div class="grid">
         <!-- Panel: CostShield Impact (Full Width) -->
         <div class="card" style="grid-column: 1 / -1; display: flex; flex-direction: column;">
-            <div class="card-header" style="border-bottom: 1px solid #cfd8dc; padding-bottom: 10px; margin-bottom: 15px;">
+            <div class="card-header" style="border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 15px;">
                 <div style="display: flex; flex-direction: column;">
-                    <h2 style="font-size: 1.3em;">CostShield Impact — Cost per Request</h2>
-                    <span style="font-size: 0.85em; color: #78909c; margin-top: 3px;">Comparative analysis of protected vs unprotected request transactions</span>
+                    <h2 style="font-size: 1.1em; color: #E2E8F0;">CostShield Impact — Cost per Request</h2>
+                    <span style="font-size: 0.8em; color: #94A3B8; margin-top: 3px; font-style: italic;">Comparative analysis of protected vs unprotected request transactions</span>
                 </div>
-                <div style="display: flex; gap: 30px; font-size: 1.2em; font-weight: bold;">
-                    <div style="color: #2e7d32;">Cost Prevented: <span id="cost-prevented">$0.0000</span></div>
-                    <div style="color: #1976d2;">Cost Reduction: <span id="cost-reduction">0.0%</span></div>
+                <div style="display: flex; gap: 30px; font-size: 1.1em; font-weight: bold; font-family: 'JetBrains Mono', monospace;">
+                    <div style="color: #10B981;">COST PREVENTED: <span id="cost-prevented">$0.0000</span></div>
+                    <div style="color: #00F5D4;">COST REDUCTION: <span id="cost-reduction">0.0%</span></div>
                 </div>
             </div>
             <div class="chart-container" style="height: 300px;"><canvas id="impactChart"></canvas></div>
@@ -70,7 +146,7 @@
         <div class="card">
             <h2>Global Spend Meter (Protected)</h2>
             <div class="big-number" id="global-spend">$0.0000</div>
-            <p style="color: #78909c; font-size: 0.9em; margin-top: 5px;">Total captured cost across protected requests</p>
+            <p style="color: #94A3B8; font-size: 0.8em; margin-top: 5px; font-style: italic;">Total captured cost across protected requests</p>
         </div>
 
         <!-- Panel 2: Spend Velocity -->
@@ -107,7 +183,7 @@
                 <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
             </div>
             <div class="feed" id="user-gauges">
-                <div style="color: #90a4ae; padding: 10px;">Awaiting data...</div>
+                <div style="color: #64748B; padding: 10px; font-style: italic;">Awaiting data...</div>
             </div>
         </div>
 
@@ -118,12 +194,17 @@
                 <button class="max-btn" onclick="toggleMaximize(this)" title="Maximize">⛶</button>
             </div>
             <div class="feed" id="action-feed">
-                <div style="color: #90a4ae; padding: 10px;">Listening for live events...</div>
+                <div style="color: #64748B; padding: 10px; font-style: italic;">Listening for live events...</div>
             </div>
         </div>
     </div>
 
     <script>
+        // Set Chart.js Typography Defaults for Elegant Technical Look
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.font.size = 11;
+        Chart.defaults.color = '#94A3B8';
+
         // Dropdown Toggle Logic
         function toggleDropdown() {
             const dropdown = document.getElementById('attack-dropdown');
@@ -148,7 +229,7 @@
                 const res = await fetch(`/api/attack/${attackKey}`, { method: 'POST' });
                 const data = await res.json();
                 if (res.ok) {
-                    statusDiv.innerHTML = `⚠️ ATTACK RUNNING<br><span style="font-size: 0.85em; font-weight: normal; color: #555;">${attackName}</span>`;
+                    statusDiv.innerHTML = `⚠️ ATTACK RUNNING<br><span style="font-size: 0.85em; font-weight: normal; color: #FF4D4D;">${attackName}</span>`;
                     setTimeout(() => {
                         statusDiv.style.display = 'none';
                     }, 12000);
@@ -200,24 +281,32 @@
         
         const VELOCITY_THRESHOLD = 0.0233;
         
-        // Setup Charts
+        // Setup Charts with Developer Telemetry Colors
         const velCtx = document.getElementById('velocityChart').getContext('2d');
         const velocityChart = new Chart(velCtx, {
             type: 'line',
             data: { 
                 labels: [], 
                 datasets: [
-                    { label: 'Spend Velocity ($/min)', data: [], borderColor: '#2196f3', tension: 0.3, fill: true, backgroundColor: 'rgba(33, 150, 243, 0.1)' },
-                    { label: 'Attack Threshold ($0.023/min)', data: [], borderColor: '#f44336', borderDash: [5, 5], pointRadius: 0, fill: false }
+                    { label: 'Spend Velocity ($/min)', data: [], borderColor: '#00F5D4', tension: 0.3, fill: true, backgroundColor: 'rgba(0, 245, 212, 0.06)' },
+                    { label: 'Attack Threshold ($0.023/min)', data: [], borderColor: '#FF4D4D', borderDash: [5, 5], pointRadius: 0, fill: false }
                 ] 
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { beginAtZero: true } }, plugins: { legend: { display: true, position: 'bottom' } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: { display: false }, 
+                    y: { beginAtZero: true, grid: { color: '#334155' } } 
+                }, 
+                plugins: { legend: { display: true, position: 'bottom' } } 
+            }
         });
 
         const breakCtx = document.getElementById('breakdownChart').getContext('2d');
         const breakdownChart = new Chart(breakCtx, {
             type: 'doughnut',
-            data: { labels: ['Input Cost', 'Output Cost'], datasets: [{ data: [0, 0], backgroundColor: ['#8e24aa', '#ffb300'] }] },
+            data: { labels: ['Input Cost', 'Output Cost'], datasets: [{ data: [0, 0], backgroundColor: ['#00F5D4', '#10B981'] }] },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
@@ -225,8 +314,12 @@
             type: 'bar',
             data: { labels: [], datasets: [] },
             options: { 
-                responsive: true, maintainAspectRatio: false, 
-                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } },
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: { stacked: true }, 
+                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#334155' } } 
+                },
                 plugins: { legend: { display: false } }
             }
         });
@@ -238,8 +331,8 @@
             data: {
                 labels: [],
                 datasets: [
-                    { label: '🛡 Protected', data: [], borderColor: '#4caf50', tension: 0.2, fill: false, borderWidth: 3 },
-                    { label: '⚡ Unprotected', data: [], borderColor: '#f44336', tension: 0.2, fill: false, borderWidth: 3 }
+                    { label: '🛡 Protected', data: [], borderColor: '#10B981', tension: 0.2, fill: false, borderWidth: 3 },
+                    { label: '⚡ Unprotected', data: [], borderColor: '#00F5D4', tension: 0.2, fill: false, borderWidth: 3 }
                 ]
             },
             options: {
@@ -247,7 +340,7 @@
                 maintainAspectRatio: false,
                 scales: {
                     x: { title: { display: true, text: 'Request #' } },
-                    y: { beginAtZero: true, title: { display: true, text: 'Actual Cost ($)' } }
+                    y: { beginAtZero: true, title: { display: true, text: 'Actual Cost ($)' }, grid: { color: '#334155' } }
                 },
                 plugins: { legend: { position: 'bottom' } }
             }
@@ -283,7 +376,7 @@
             const unprotectedData = [];
             
             for (let i = 0; i < count; i++) {
-                labels.push(`Request ${i + 1}`);
+                labels.push(`Req ${i + 1}`);
                 const pVal = protectedList[i] !== undefined ? protectedList[i] : 0.0;
                 const uVal = unprotectedList[i] !== undefined ? unprotectedList[i] : 0.0;
                 
@@ -311,6 +404,9 @@
             impactChart.data.datasets[1].data = unprotectedData;
             impactChart.update();
         }
+
+        // Tonal variations (Cyber navy to slate to cyan to emerald)
+        const telemetryPalette = ['#00F5D4', '#10B981', '#334155', '#4E5A43', '#0097a7', '#1E293B'];
 
         // Initialize SSE Connection
         const evtSource = new EventSource("/dashboard/stream");
@@ -363,9 +459,7 @@
             let dataset = heatmapChart.data.datasets.find(ds => ds.label === 'Protected' || ds.label === data.user_id);
             if (!dataset) {
                 const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
-                let hash = 0;
-                for (let i = 0; i < data.user_id.length; i++) hash = data.user_id.charCodeAt(i) + ((hash << 5) - hash);
-                const color = `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
+                const color = telemetryPalette[heatmapChart.data.datasets.length % telemetryPalette.length];
                 dataset = { label: displayName, data: Array(heatmapChart.data.labels.length).fill(0), backgroundColor: color };
                 heatmapChart.data.datasets.push(dataset);
             }
@@ -374,28 +468,50 @@
             dataset.data[currentMinIndex] += 1;
             heatmapChart.update();
             
-            // 4. Update User Gauges
+            // 4. Update User Gauges (Healthy / Warning / Critical gauge colors)
             if (gaugesEmpty) { document.getElementById('user-gauges').innerHTML = ''; gaugesEmpty = false; }
             const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
             if (!userSpend[displayName]) userSpend[displayName] = 0;
             userSpend[displayName] += cost;
             const gaugesDiv = document.getElementById('user-gauges');
+            
+            // Render gauges ordered descending
             gaugesDiv.innerHTML = Object.entries(userSpend)
-                .sort((a,b) => b[1] - a[1]) // highest first
-                .map(([user, amt]) => `<div class="feed-item" style="display: flex; justify-content: space-between;"><strong>${user}</strong> <span>$${amt.toFixed(4)}</span></div>`)
+                .sort((a,b) => b[1] - a[1]) 
+                .map(([user, amt]) => {
+                    // Muted states: forest/olive (<50%) -> gold (<80%) -> burgundy/terracotta (>=80%)
+                    let stateColor = '#10B981'; // Healthy Emerald
+                    if (amt > 1.6) stateColor = '#FF4D4D'; // Crimson
+                    else if (amt > 1.0) stateColor = '#00F5D4'; // Electric Cyan
+                    
+                    return `<div class="feed-item" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155;">
+                        <strong>${user}</strong> 
+                        <span style="color: ${stateColor}; font-weight: bold;">$${amt.toFixed(4)}</span>
+                    </div>`;
+                })
                 .join('');
                 
-            // 5. Update Action Feed
+            // 5. Update Action Feed (ALLOWED -> emerald, REDUCE -> cyan, SOFT_DENY -> crimson, HARD_DENY -> vibrant crimson)
             if (actionFeedEmpty) { document.getElementById('action-feed').innerHTML = ''; actionFeedEmpty = false; }
             const feedDiv = document.getElementById('action-feed');
-            const isBlocked = data.status.includes('BLOCK') || data.status.includes('REJECT');
-            const cssClass = isBlocked ? 'blocked' : 'allowed';
+            
+            let cssClass = 'allowed'; // Muted emerald
+            if (data.status.includes('BLOCK') || data.status.includes('REJECT')) {
+                cssClass = 'blocked'; // Crimson
+            }
             
             const item = document.createElement('div');
             item.className = `feed-item ${cssClass}`;
             
+            // Color evaluate text specifically
+            let actionText = data.policy_action;
+            let actionColor = '#10B981'; // Default allowed
+            if (actionText === 'HARD_DENY') actionColor = '#FF4D4D';
+            else if (actionText === 'SOFT_DENY') actionColor = '#FF4D4D';
+            else if (actionText.includes('REDUCE')) actionColor = '#00F5D4';
+            
             const details = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out`;
-            item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${displayName}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
+            item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${displayName}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong style="color: ${actionColor};">${actionText}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
             
             feedDiv.prepend(item);
             if (feedDiv.children.length > 50) {
