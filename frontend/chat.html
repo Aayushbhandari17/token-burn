@@ -5,33 +5,28 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background: #f0f4f8; }
         
-        /* Main Chat Area */
-        #chat-section { flex: 1; display: flex; flex-direction: column; max-width: 800px; margin: 0 auto; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        /* Main Chat Section */
+        #chat-section { flex: 1; display: flex; flex-direction: column; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
         .header { padding: 20px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
         .header h1 { margin: 0; font-size: 1.5em; color: #333; }
         
-        #messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; line-height: 1.4; word-wrap: break-word; }
+        .msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; word-wrap: break-word; font-size: 0.9em; }
         .msg.user { background: #1976d2; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
         .msg.bot { background: #f1f3f4; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
         .msg.error { background: #ffebee; color: #c62828; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #ef9a9a; }
-        .msg-meta { font-size: 0.8em; margin-top: 5px; opacity: 0.8; }
-        
-        #input-area { padding: 20px; background: #fff; border-top: 1px solid #e0e0e0; }
-        .input-wrapper { display: flex; gap: 10px; }
-        #prompt-input { flex: 1; padding: 12px; border: 1px solid #cfd8dc; border-radius: 24px; font-size: 1em; outline: none; }
-        #prompt-input:focus { border-color: #1976d2; }
-        #tier-select { padding: 10px; border: 1px solid #cfd8dc; border-radius: 12px; outline: none; }
-        button.send-btn { padding: 10px 24px; background: #1976d2; color: white; border: none; border-radius: 24px; cursor: pointer; font-weight: bold; }
         
         /* Attack Sidebar */
-        #attack-sidebar { width: 300px; background: #263238; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+        #attack-sidebar { width: 300px; background: #263238; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
         #attack-sidebar h2 { margin-top: 0; font-size: 1.2em; color: #eceff1; border-bottom: 1px solid #455a64; padding-bottom: 10px; }
-        .attack-btn { width: 100%; padding: 15px; margin-bottom: 10px; background: #37474f; color: white; border: 1px solid #546e7a; border-radius: 8px; cursor: pointer; font-size: 1em; font-weight: bold; text-align: left; transition: background 0.2s; }
+        .attack-btn { width: 100%; padding: 12px; margin-bottom: 8px; background: #37474f; color: white; border: 1px solid #546e7a; border-radius: 8px; cursor: pointer; font-size: 0.95em; font-weight: bold; text-align: left; transition: background 0.2s; }
         .attack-btn:hover { background: #455a64; }
-        .attack-desc { font-size: 0.8em; color: #b0bec5; margin-top: 5px; font-weight: normal; }
+        .attack-desc { font-size: 0.75em; color: #b0bec5; margin-top: 3px; font-weight: normal; }
         
         #attack-status { margin-top: auto; padding: 15px; background: #1c252a; border-radius: 8px; font-family: monospace; font-size: 0.85em; color: #4caf50; min-height: 50px; }
+        
+        .metric-group { display: flex; flex-wrap: wrap; gap: 10px; }
+        .metric-badge { background: #e0e0e0; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+        .metric-badge.highlight { background: #bbdefb; color: #0d47a1; }
     </style>
 </head>
 <body>
@@ -39,23 +34,77 @@
     <!-- Main Chat Section -->
     <div id="chat-section">
         <div class="header">
-            <h1>LLM Interface</h1>
+            <h1>LLM Interface (Comparison Mode)</h1>
             <a href="/dashboard-ui" target="_blank" style="color: #1976d2; text-decoration: none; font-weight: bold;">Open Dashboard ↗</a>
         </div>
         
-        <div id="messages">
-            <div class="msg bot">Hello! I am the Mock LLM. Send me a prompt, and the defense system will evaluate it before I respond.</div>
-        </div>
-        
-        <div id="input-area">
-            <div class="input-wrapper">
-                <select id="tier-select">
-                    <option value="free">Free Tier</option>
-                    <option value="admin">Admin Tier</option>
-                </select>
-                <input type="text" id="prompt-input" placeholder="Enter your prompt here..." onkeypress="if(event.key === 'Enter') sendChat()">
-                <button class="send-btn" onclick="sendChat()">Send</button>
+        <!-- Side-by-Side Containers -->
+        <div style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box;">
+            
+            <!-- Protected Column -->
+            <div id="free-column" style="flex: 1; display: flex; flex-direction: column; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+                <div style="background: #e8f5e9; color: #2e7d32; padding: 10px 15px; font-weight: bold; border-bottom: 1px solid #c8e6c9; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span>🛡 PROTECTED</span>
+                        <span style="font-size: 0.75em; color: #2e7d32; font-weight: normal; margin-top: 2px;">CostShield Active</span>
+                    </div>
+                    <span id="free-status-badge" style="font-size: 0.75em; background: #c8e6c9; padding: 2px 8px; border-radius: 12px; font-weight: bold;">READY</span>
+                </div>
+                
+                <div id="free-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                    <div class="msg bot">Hello! I am the Protected Mock LLM. Send a prompt to test my defenses.</div>
+                </div>
+                
+                <!-- Protected Metrics Info -->
+                <div id="free-metrics" style="padding: 10px 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0; font-size: 0.75em; color: #455a64; line-height: 1.5;">
+                    <div class="metric-group">
+                        <span>Cost: <strong id="free-metric-cost">$0.00000</strong></span> |
+                        <span>Latency: <strong id="free-metric-latency">0ms</strong></span> |
+                        <span>Tokens: <strong id="free-metric-tokens">0 In / 0 Out</strong></span>
+                    </div>
+                    <div style="margin-top: 5px; border-top: 1px dashed #cfd8dc; padding-top: 5px;" class="metric-group">
+                        <span class="metric-badge highlight">Score: <strong id="free-metric-score">0</strong></span>
+                        <span class="metric-badge highlight">Action: <strong id="free-metric-action">ALLOW</strong></span>
+                        <span id="free-metric-reason" style="color: #757575;"></span>
+                    </div>
+                </div>
+                
+                <div style="padding: 15px; background: #fff; border-top: 1px solid #e0e0e0;">
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid #cfd8dc; border-radius: 20px; outline: none; font-size: 0.95em;" onkeypress="if(event.key === 'Enter') sendChat()">
+                        <button class="send-btn" onclick="sendChat()" style="padding: 8px 20px; background: #1976d2; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">Send</button>
+                    </div>
+                </div>
             </div>
+
+            <!-- Unprotected Column -->
+            <div id="admin-column" style="flex: 1; display: flex; flex-direction: column; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+                <div style="background: #eceff1; color: #37474f; padding: 10px 15px; font-weight: bold; border-bottom: 1px solid #cfd8dc; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column;">
+                        <span>⚡ UNPROTECTED</span>
+                        <span style="font-size: 0.75em; color: #37474f; font-weight: normal; margin-top: 2px;">Baseline</span>
+                    </div>
+                    <span id="admin-status-badge" style="font-size: 0.75em; background: #cfd8dc; padding: 2px 8px; border-radius: 12px; font-weight: bold;">READY</span>
+                </div>
+                
+                <div id="admin-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                    <div class="msg bot">Hello! I am the Baseline Mock LLM. I bypass all budget controls and scoring evaluations.</div>
+                </div>
+                
+                <!-- Unprotected Metrics Info -->
+                <div id="admin-metrics" style="padding: 10px 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0; font-size: 0.75em; color: #455a64; line-height: 1.5; min-height: 38px; display: flex; align-items: center;">
+                    <div class="metric-group">
+                        <span>Cost: <strong id="admin-metric-cost">$0.00000</strong></span> |
+                        <span>Latency: <strong id="admin-metric-latency">0ms</strong></span> |
+                        <span>Tokens: <strong id="admin-metric-tokens">0 In / 0 Out</strong></span>
+                    </div>
+                </div>
+                
+                <div style="padding: 15px; background: #fff; border-top: 1px solid #e0e0e0;">
+                    <input type="text" id="admin-prompt-input" placeholder="[Mirrored Prompt]" readonly style="width: 100%; padding: 10px 15px; border: 1px solid #e0e0e0; border-radius: 20px; outline: none; background: #f5f5f5; color: #757575; cursor: not-allowed; box-sizing: border-box; font-size: 0.95em;">
+                </div>
+            </div>
+            
         </div>
     </div>
 
@@ -64,7 +113,7 @@
         <!-- Budget Widget -->
         <div id="budget-widget" style="background: #1c252a; padding: 15px; border-radius: 8px;">
             <h3 style="margin: 0 0 10px 0; font-size: 1em; color: #eceff1; display: flex; justify-content: space-between;">
-                <span>Daily Budget</span>
+                <span>Free Daily Budget</span>
                 <span id="budget-percent" style="color: #4caf50;">100%</span>
             </h3>
             <div style="background: #37474f; border-radius: 4px; height: 10px; width: 100%; overflow: hidden;">
@@ -94,94 +143,168 @@
     </div>
 
     <script>
-        const messagesDiv = document.getElementById('messages');
-        const promptInput = document.getElementById('prompt-input');
-        const tierSelect = document.getElementById('tier-select');
+        const freeInput = document.getElementById('prompt-input');
+        const adminInput = document.getElementById('admin-prompt-input');
+        const freeMessages = document.getElementById('free-messages');
+        const adminMessages = document.getElementById('admin-messages');
         const attackStatus = document.getElementById('attack-status');
+
+        // Synchronize inputs instantly
+        freeInput.addEventListener('input', (e) => {
+            adminInput.value = e.target.value;
+        });
 
         async function updateBudgetMeter() {
             try {
-                const tier = tierSelect.value;
-                const res = await fetch(`/api/budget/demo_manual_user/${tier}`);
+                // Free budget tracking query
+                const res = await fetch(`/api/budget/phase10_free/free`);
                 const data = await res.json();
                 
                 const percentSpan = document.getElementById('budget-percent');
                 const bar = document.getElementById('budget-bar');
                 const text = document.getElementById('budget-text');
                 
-                if (data.limit_usd === "Unlimited") {
-                    percentSpan.innerText = "∞";
-                    bar.style.width = "100%";
-                    bar.style.background = "#2196f3";
-                    percentSpan.style.color = "#2196f3";
-                    text.innerText = "Unlimited (Admin Tier)";
-                } else {
-                    const p = Math.max(0, Math.min(100, data.percentage));
-                    percentSpan.innerText = `${p.toFixed(1)}%`;
-                    bar.style.width = `${p}%`;
-                    
-                    if (p > 50) { bar.style.background = "#4caf50"; percentSpan.style.color = "#4caf50"; }
-                    else if (p > 20) { bar.style.background = "#ff9800"; percentSpan.style.color = "#ff9800"; }
-                    else { bar.style.background = "#f44336"; percentSpan.style.color = "#f44336"; }
-                    
-                    text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
-                }
+                const p = Math.max(0, Math.min(100, data.percentage));
+                percentSpan.innerText = `${p.toFixed(1)}%`;
+                bar.style.width = `${p}%`;
+                
+                if (p > 50) { bar.style.background = "#4caf50"; percentSpan.style.color = "#4caf50"; }
+                else if (p > 20) { bar.style.background = "#ff9800"; percentSpan.style.color = "#ff9800"; }
+                else { bar.style.background = "#f44336"; percentSpan.style.color = "#f44336"; }
+                
+                text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
             } catch (err) {
                 console.error("Failed to fetch budget:", err);
             }
         }
         
-        // Update on startup and when tier changes
         window.onload = updateBudgetMeter;
-        tierSelect.addEventListener('change', updateBudgetMeter);
 
-        function appendMessage(text, type, meta = '') {
+        function appendMessage(container, text, type, meta = '') {
             const wrapper = document.createElement('div');
             wrapper.className = `msg ${type}`;
             wrapper.innerText = text;
             if (meta) {
                 const metaDiv = document.createElement('div');
-                metaDiv.className = 'msg-meta';
-                metaDiv.innerHTML = meta;
+                metaDiv.style.fontSize = '0.8em';
+                metaDiv.style.marginTop = '4px';
+                metaDiv.style.opacity = '0.8';
+                metaDiv.innerText = meta;
                 wrapper.appendChild(metaDiv);
             }
-            messagesDiv.appendChild(wrapper);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+            return wrapper;
         }
 
         async function sendChat() {
-            const prompt = promptInput.value.trim();
+            const prompt = freeInput.value.trim();
             if (!prompt) return;
             
-            appendMessage(prompt, 'user');
-            promptInput.value = '';
+            // Append users messages
+            appendMessage(freeMessages, prompt, 'user');
+            appendMessage(adminMessages, prompt, 'user');
             
-            try {
-                const res = await fetch("/chat", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        user_id: "demo_manual_user",
-                        tier: tierSelect.value,
-                        prompt: prompt
-                    })
-                });
-                
+            freeInput.value = '';
+            adminInput.value = '';
+            
+            // Update statuses to working
+            const freeBadge = document.getElementById('free-status-badge');
+            const adminBadge = document.getElementById('admin-status-badge');
+            
+            freeBadge.innerText = "ANALYZING...";
+            freeBadge.style.background = "#ffe082";
+            freeBadge.style.color = "#b78103";
+            
+            adminBadge.innerText = "GENERATING...";
+            adminBadge.style.background = "#ffe082";
+            adminBadge.style.color = "#b78103";
+            
+            // Loading placeholder message
+            const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot");
+            const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
+            
+            // Dispatch parallel requests
+            const freePromise = fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: "phase10_free", tier: "free", prompt: prompt })
+            });
+
+            const adminPromise = fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: "phase10_admin", tier: "admin", prompt: prompt })
+            });
+
+            // Handle Free Tier Completion
+            freePromise.then(async (res) => {
                 const data = await res.json();
+                freeMessages.removeChild(freeLoadMsg);
                 
                 if (res.ok) {
-                    const meta = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out | Cost: $${data.cost.total_cost.toFixed(5)}`;
-                    appendMessage(data.text, 'bot', meta);
+                    appendMessage(freeMessages, data.text, 'bot');
+                    document.getElementById('free-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
+                    document.getElementById('free-metric-latency').innerText = `${data.latency_ms}ms`;
+                    document.getElementById('free-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                    
+                    document.getElementById('free-metric-score').innerText = data._debug_score;
+                    document.getElementById('free-metric-action').innerText = data._debug_action;
+                    document.getElementById('free-metric-reason').innerText = data._debug_reasons.length > 0 ? `(${data._debug_reasons.join(', ')})` : '';
+                    
+                    freeBadge.innerText = "COMPLETED";
+                    freeBadge.style.background = "#c8e6c9";
+                    freeBadge.style.color = "#2e7d32";
                 } else {
-                    const meta = `HTTP ${res.status}`;
-                    appendMessage(`Blocked: ${data.detail}`, 'error', meta);
+                    appendMessage(freeMessages, `Blocked: ${data.detail}`, 'error');
+                    document.getElementById('free-metric-cost').innerText = "$0.00000";
+                    document.getElementById('free-metric-latency').innerText = "0ms";
+                    document.getElementById('free-metric-tokens').innerText = "0 In / 0 Out";
+                    
+                    document.getElementById('free-metric-score').innerText = "N/A";
+                    document.getElementById('free-metric-action').innerText = "DENIED";
+                    document.getElementById('free-metric-reason').innerText = `(${data.detail})`;
+                    
+                    freeBadge.innerText = "BLOCKED";
+                    freeBadge.style.background = "#ffcdd2";
+                    freeBadge.style.color = "#c62828";
                 }
+                updateBudgetMeter();
+            }).catch((err) => {
+                freeMessages.removeChild(freeLoadMsg);
+                appendMessage(freeMessages, `Network Error: ${err.message}`, 'error');
+                freeBadge.innerText = "ERROR";
+                freeBadge.style.background = "#ffcdd2";
+                freeBadge.style.color = "#c62828";
+            });
+
+            // Handle Admin Tier Completion
+            adminPromise.then(async (res) => {
+                const data = await res.json();
+                adminMessages.removeChild(adminLoadMsg);
                 
-                // Refresh the budget meter dynamically
-                await updateBudgetMeter();
-            } catch (err) {
-                appendMessage(`Network Error: ${err.message}`, 'error');
-            }
+                if (res.ok) {
+                    appendMessage(adminMessages, data.text, 'bot');
+                    document.getElementById('admin-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
+                    document.getElementById('admin-metric-latency').innerText = `${data.latency_ms}ms`;
+                    document.getElementById('admin-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                    
+                    adminBadge.innerText = "COMPLETED";
+                    adminBadge.style.background = "#c8e6c9";
+                    adminBadge.style.color = "#2e7d32";
+                } else {
+                    appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
+                    adminBadge.innerText = "FAILED";
+                    adminBadge.style.background = "#ffcdd2";
+                    adminBadge.style.color = "#c62828";
+                }
+            }).catch((err) => {
+                adminMessages.removeChild(adminLoadMsg);
+                appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
+                adminBadge.innerText = "ERROR";
+                adminBadge.style.background = "#ffcdd2";
+                adminBadge.style.color = "#c62828";
+            });
         }
 
         async function triggerAttack(attackName) {

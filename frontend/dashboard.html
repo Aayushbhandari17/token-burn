@@ -29,12 +29,28 @@
 <body>
     <div id="backdrop" onclick="closeMaximized()"></div>
     <h1 style="color: #263238; margin-bottom: 20px;">Live Spend Dashboard</h1>
+    
     <div class="grid">
+        <!-- New Panel: CostShield Impact (Full Width) -->
+        <div class="card" style="grid-column: 1 / -1; display: flex; flex-direction: column;">
+            <div class="card-header" style="border-bottom: 1px solid #cfd8dc; padding-bottom: 10px; margin-bottom: 15px;">
+                <div style="display: flex; flex-direction: column;">
+                    <h2 style="font-size: 1.3em;">CostShield Impact — Cost per Request</h2>
+                    <span style="font-size: 0.85em; color: #78909c; margin-top: 3px;">Comparative analysis of protected vs unprotected request transactions</span>
+                </div>
+                <div style="display: flex; gap: 30px; font-size: 1.2em; font-weight: bold;">
+                    <div style="color: #2e7d32;">Cost Prevented: <span id="cost-prevented">$0.0000</span></div>
+                    <div style="color: #1976d2;">Cost Reduction: <span id="cost-reduction">0.0%</span></div>
+                </div>
+            </div>
+            <div class="chart-container" style="height: 300px;"><canvas id="impactChart"></canvas></div>
+        </div>
+
         <!-- Panel 1: Global Spend Meter -->
         <div class="card">
-            <h2>Global Spend Meter</h2>
+            <h2>Global Spend Meter (Protected)</h2>
             <div class="big-number" id="global-spend">$0.0000</div>
-            <p style="color: #78909c; font-size: 0.9em; margin-top: 5px;">Total captured cost across all requests</p>
+            <p style="color: #78909c; font-size: 0.9em; margin-top: 5px;">Total captured cost across protected requests</p>
         </div>
 
         <!-- Panel 2: Spend Velocity -->
@@ -120,7 +136,10 @@
         let actionFeedEmpty = true;
         let gaugesEmpty = true;
         
-        // Attack-level threshold: 70% of $2.00 (free daily limit) over 1 hour = $1.40 / hour = ~$0.0233 / minute
+        // Parallel streams for CostShield Impact Comparison
+        let protectedList = [];
+        let unprotectedList = [];
+        
         const VELOCITY_THRESHOLD = 0.0233;
         
         // Setup Charts
@@ -154,6 +173,28 @@
                 plugins: { legend: { display: false } }
             }
         });
+        
+        // Setup CostShield Impact Line Chart
+        const impCtx = document.getElementById('impactChart').getContext('2d');
+        const impactChart = new Chart(impCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: '🛡 Protected', data: [], borderColor: '#4caf50', tension: 0.2, fill: false, borderWidth: 3 },
+                    { label: '⚡ Unprotected', data: [], borderColor: '#f44336', tension: 0.2, fill: false, borderWidth: 3 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { title: { display: true, text: 'Request #' } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Actual Cost ($)' } }
+                },
+                plugins: { legend: { position: 'bottom' } }
+            }
+        });
 
         // Background Velocity Updater (runs every 2 seconds to plot rolling 1-minute spend)
         setInterval(() => {
@@ -174,11 +215,64 @@
             velocityChart.update();
         }, 2000);
 
+        function updateImpactChart() {
+            let costPrevented = 0.0;
+            let totalUnprotected = 0.0;
+            let totalProtected = 0.0;
+            
+            const count = Math.max(protectedList.length, unprotectedList.length);
+            const labels = [];
+            const protectedData = [];
+            const unprotectedData = [];
+            
+            for (let i = 0; i < count; i++) {
+                labels.push(`Request ${i + 1}`);
+                const pVal = protectedList[i] !== undefined ? protectedList[i] : 0.0;
+                const uVal = unprotectedList[i] !== undefined ? unprotectedList[i] : 0.0;
+                
+                protectedData.push(pVal);
+                unprotectedData.push(uVal);
+                
+                totalProtected += pVal;
+                totalUnprotected += uVal;
+                
+                costPrevented += Math.max(0.0, uVal - pVal);
+            }
+            
+            // Update KPIs
+            document.getElementById('cost-prevented').innerText = '$' + costPrevented.toFixed(4);
+            if (totalUnprotected > 0) {
+                const pct = ((totalUnprotected - totalProtected) / totalUnprotected) * 100;
+                document.getElementById('cost-reduction').innerText = Math.max(0, pct).toFixed(1) + '%';
+            } else {
+                document.getElementById('cost-reduction').innerText = '0.0%';
+            }
+            
+            // Push values to Chart
+            impactChart.data.labels = labels;
+            impactChart.data.datasets[0].data = protectedData;
+            impactChart.data.datasets[1].data = unprotectedData;
+            impactChart.update();
+        }
+
         // Initialize SSE Connection
         const evtSource = new EventSource("/dashboard/stream");
         evtSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
             const cost = parseFloat(data.actual_cost) || 0.0;
+            
+            // Group cost streams for comparison logic first
+            if (data.tier === 'free') {
+                protectedList.push(cost);
+                updateImpactChart();
+            } else if (data.tier === 'admin') {
+                unprotectedList.push(cost);
+                updateImpactChart();
+            }
+            
+            // Filter all remaining panels so they reflect only Protected tier data
+            if (data.tier !== 'free') return;
+            
             const timeLabelSec = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
             const minuteStr = new Date(data.timestamp * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
             
@@ -209,13 +303,13 @@
                 }
             }
             
-            let dataset = heatmapChart.data.datasets.find(ds => ds.label === data.user_id);
+            let dataset = heatmapChart.data.datasets.find(ds => ds.label === 'Protected' || ds.label === data.user_id);
             if (!dataset) {
-                // Generate a consistent deterministic color for the user
+                const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
                 let hash = 0;
                 for (let i = 0; i < data.user_id.length; i++) hash = data.user_id.charCodeAt(i) + ((hash << 5) - hash);
                 const color = `hsl(${Math.abs(hash) % 360}, 70%, 60%)`;
-                dataset = { label: data.user_id, data: Array(heatmapChart.data.labels.length).fill(0), backgroundColor: color };
+                dataset = { label: displayName, data: Array(heatmapChart.data.labels.length).fill(0), backgroundColor: color };
                 heatmapChart.data.datasets.push(dataset);
             }
             
@@ -225,8 +319,9 @@
             
             // 4. Update User Gauges
             if (gaugesEmpty) { document.getElementById('user-gauges').innerHTML = ''; gaugesEmpty = false; }
-            if (!userSpend[data.user_id]) userSpend[data.user_id] = 0;
-            userSpend[data.user_id] += cost;
+            const displayName = data.user_id === 'phase10_free' ? 'Protected' : data.user_id;
+            if (!userSpend[displayName]) userSpend[displayName] = 0;
+            userSpend[displayName] += cost;
             const gaugesDiv = document.getElementById('user-gauges');
             gaugesDiv.innerHTML = Object.entries(userSpend)
                 .sort((a,b) => b[1] - a[1]) // highest first
@@ -243,7 +338,7 @@
             item.className = `feed-item ${cssClass}`;
             
             const details = `Tokens: ${data.input_tokens} In / ${data.output_tokens} Out`;
-            item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${data.user_id}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
+            item.innerHTML = `<strong>[${timeLabelSec}]</strong> User: <em>${displayName}</em> | Score: <strong>${data.risk_score}</strong> | Action: <strong>${data.policy_action}</strong> | Cost: $${cost.toFixed(4)} | ${details}`;
             
             feedDiv.prepend(item);
             if (feedDiv.children.length > 50) {
