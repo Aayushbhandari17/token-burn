@@ -24,14 +24,34 @@
         .card.maximized .chart-container, .card.maximized .feed { height: 100%; flex: 1; max-height: none; }
         #backdrop { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; backdrop-filter: blur(2px); }
         #backdrop.active { display: block; }
+        
+        #attack-dropdown a:hover { background-color: #f5f5f5; color: #1976d2; }
     </style>
 </head>
 <body>
     <div id="backdrop" onclick="closeMaximized()"></div>
-    <h1 style="color: #263238; margin-bottom: 20px;">Live Spend Dashboard</h1>
+    
+    <!-- Dashboard Header Area with Simulator Dropdown -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1 style="color: #263238; margin: 0;">Live Spend Dashboard</h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div id="attack-status" style="font-size: 0.85em; color: #c62828; font-weight: bold; display: none; background: #ffebee; border: 1px solid #ffcdd2; padding: 6px 12px; border-radius: 8px; line-height: 1.3;"></div>
+            
+            <div style="position: relative; display: inline-block;">
+                <button onclick="toggleDropdown()" style="padding: 10px 16px; background: #263238; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9em; display: flex; align-items: center; gap: 5px;">
+                    🧪 ATTACK SIMULATOR ▾
+                </button>
+                <div id="attack-dropdown" style="display: none; position: absolute; right: 0; top: 110%; background: #ffffff; min-width: 240px; box-shadow: 0 8px 16px rgba(0,0,0,0.1); border-radius: 8px; z-index: 1001; border: 1px solid #cfd8dc; overflow: hidden;">
+                    <a href="#" onclick="runAttack('naive', 'Naive Output Maximizer')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #eceff1; transition: background 0.2s;">⚡ Naive Output Maximizer</a>
+                    <a href="#" onclick="runAttack('context', 'Context Stuffer')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; border-bottom: 1px solid #eceff1; transition: background 0.2s;">📚 Context Stuffer</a>
+                    <a href="#" onclick="runAttack('sybil', 'Sybil Burst')" style="color: #37474f; padding: 12px 16px; text-decoration: none; display: block; font-size: 0.9em; font-weight: 500; transition: background 0.2s;">👥 Sybil Burst</a>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <div class="grid">
-        <!-- New Panel: CostShield Impact (Full Width) -->
+        <!-- Panel: CostShield Impact (Full Width) -->
         <div class="card" style="grid-column: 1 / -1; display: flex; flex-direction: column;">
             <div class="card-header" style="border-bottom: 1px solid #cfd8dc; padding-bottom: 10px; margin-bottom: 15px;">
                 <div style="display: flex; flex-direction: column;">
@@ -104,6 +124,44 @@
     </div>
 
     <script>
+        // Dropdown Toggle Logic
+        function toggleDropdown() {
+            const dropdown = document.getElementById('attack-dropdown');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+        
+        window.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('attack-dropdown');
+            if (!e.target.closest('#attack-dropdown') && !e.target.closest('button')) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        async function runAttack(attackKey, attackName) {
+            document.getElementById('attack-dropdown').style.display = 'none';
+            
+            const statusDiv = document.getElementById('attack-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = `🧪 Running: ${attackName}`;
+            
+            try {
+                const res = await fetch(`/api/attack/${attackKey}`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok) {
+                    statusDiv.innerHTML = `⚠️ ATTACK RUNNING<br><span style="font-size: 0.85em; font-weight: normal; color: #555;">${attackName}</span>`;
+                    setTimeout(() => {
+                        statusDiv.style.display = 'none';
+                    }, 12000);
+                } else {
+                    statusDiv.innerText = `❌ Error starting: ${data.detail || res.statusText}`;
+                    setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+                }
+            } catch (err) {
+                statusDiv.innerText = `❌ Error: ${err.message}`;
+                setTimeout(() => { statusDiv.style.display = 'none'; }, 5000);
+            }
+        }
+
         // Maximize Functionality
         let currentMaximized = null;
         function toggleMaximize(btn) {
@@ -163,8 +221,7 @@
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
         });
 
-        const heatCtx = document.getElementById('heatmapChart').getContext('2d');
-        const heatmapChart = new Chart(heatCtx, {
+        const heatmapChart = new Chart(document.getElementById('heatmapChart').getContext('2d'), {
             type: 'bar',
             data: { labels: [], datasets: [] },
             options: { 
