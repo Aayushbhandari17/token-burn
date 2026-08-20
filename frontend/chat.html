@@ -10,18 +10,29 @@
             margin: 0; 
             padding: 0; 
             display: flex; 
+            justify-content: center;
+            align-items: center;
             height: 100vh; 
-            background: #F8F9FA; 
+            background: #0B1E36; 
             color: #0B1E36; 
         }
         
-        /* Main Chat Section */
+        /* Floating elevated chatbot window */
         #chat-section { 
-            flex: 1; 
+            width: 90%;
+            max-width: 1200px;
+            height: 85vh;
             display: flex; 
             flex-direction: column; 
-            background: #F8F9FA; 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 12px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
         }
+        
         .header { 
             padding: 20px; 
             background: #FFFFFF; 
@@ -29,12 +40,11 @@
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
         }
         .header h1 { 
             margin: 0; 
             font-family: 'Lora', Georgia, serif; 
-            font-size: 1.5em; 
+            font-size: 1.4em; 
             color: #0B1E36; 
             font-weight: 700; 
         }
@@ -69,20 +79,6 @@
             border: 1px solid #FCA5A5; 
         }
         
-        /* Sidebar container to hold Free Daily Budget */
-        #attack-sidebar { 
-            width: 300px; 
-            background: #FFFFFF; 
-            color: #0B1E36; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 20px; 
-            box-sizing: border-box; 
-            border-left: 1px solid #E2E8F0;
-            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.02);
-        }
-        
         .metric-group { 
             display: flex; 
             flex-wrap: wrap; 
@@ -104,8 +100,12 @@
             color: #047857; 
             border: 1px solid #A7F3D0;
         }
+        .metric-badge.rose-highlight {
+            background: #F8E7EA;
+            color: #A85D68;
+            border: 1px solid #C98F98;
+        }
         
-        /* Input elements styles */
         input[type="text"] {
             font-family: 'Inter', sans-serif;
             font-size: 0.9em;
@@ -124,22 +124,25 @@
 </head>
 <body>
 
-    <!-- Main Chat Section -->
+    <!-- Main Elevated Chat Section -->
     <div id="chat-section">
         <div class="header">
-            <h1>LLM Interface (Comparison Mode)</h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <h1>LLM Interface</h1>
+                <button id="toggle-comparison-btn" onclick="toggleComparison()" style="padding: 8px 16px; background: #0B1E36; color: #FFFFFF; border: 1px solid #0B1E36; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; transition: background 0.15s;">Compare Unprotected</button>
+            </div>
             <a href="/dashboard-ui" target="_blank" style="color: #0B1E36; text-decoration: none; font-weight: 600; font-size: 0.9em; border-bottom: 2px solid #C5A059; padding-bottom: 2px;">Open Dashboard ↗</a>
         </div>
         
         <!-- Side-by-Side Containers -->
-        <div style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box;">
+        <div id="chat-container" style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box; justify-content: center; align-items: stretch; width: 100%;">
             
-            <!-- Protected Column -->
-            <div id="free-column" style="flex: 1; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);">
+            <!-- Protected Column (default centered width) -->
+            <div id="free-column" style="flex: 1; max-width: 600px; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; transition: max-width 0.25s ease-in-out;">
                 <div style="background: #ECFDF5; color: #047857; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
-                        <span style="letter-spacing: 0.5px; font-weight: 700;">🛡 PROTECTED</span>
-                        <span style="font-size: 0.75em; color: #047857; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">CostShield Active</span>
+                        <span style="letter-spacing: 0.5px; font-weight: 700;">PROTECTED</span>
+                        <span style="font-size: 0.75em; color: #047857; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Shield Active</span>
                     </div>
                     <span id="free-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #047857; border: 1px solid #A7F3D0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
                 </div>
@@ -170,14 +173,14 @@
                 </div>
             </div>
 
-            <!-- Unprotected Column -->
-            <div id="admin-column" style="flex: 1; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);">
-                <div style="background: #F8F9FA; color: #0B1E36; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+            <!-- Unprotected Column (hidden by default, dusty rose theme) -->
+            <div id="admin-column" style="display: none; flex: 1; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border-color: #C98F98;">
+                <div style="background: #F8E7EA; color: #A85D68; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
-                        <span style="letter-spacing: 0.5px; font-weight: 700;">⚡ UNPROTECTED</span>
-                        <span style="font-size: 0.75em; color: #0B1E36; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Baseline</span>
+                        <span style="letter-spacing: 0.5px; font-weight: 700;">UNPROTECTED</span>
+                        <span style="font-size: 0.75em; color: #A85D68; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Baseline</span>
                     </div>
-                    <span id="admin-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #0B1E36; border: 1px solid #E2E8F0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
+                    <span id="admin-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #A85D68; border: 1px solid #C98F98; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
                 </div>
                 
                 <div id="admin-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #FAFBFB;">
@@ -201,66 +204,34 @@
         </div>
     </div>
 
-    <!-- Sidebar to hold budget widgets -->
-    <div id="attack-sidebar">
-        <!-- Budget Widget -->
-        <div id="budget-widget" style="background: #FFFFFF; padding: 15px; border-radius: 8px; border: 1px solid #E2E8F0; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
-            <h3 style="margin: 0 0 10px 0; font-size: 0.95em; color: #0B1E36; display: flex; justify-content: space-between; font-weight: 600; font-family: 'Lora', Georgia, serif;">
-                <span>Free Daily Budget</span>
-                <span id="budget-percent" style="color: #047857; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">100%</span>
-            </h3>
-            <div style="background: #F8F9FA; border-radius: 4px; height: 8px; width: 100%; overflow: hidden; border: 1px solid #E2E8F0;">
-                <div id="budget-bar" style="background: #047857; height: 100%; width: 100%; transition: width 0.3s;"></div>
-            </div>
-            <div id="budget-text" style="font-size: 0.8em; color: #64748B; margin-top: 8px; font-family: 'IBM Plex Mono', monospace;">Loading...</div>
-        </div>
-    </div>
-
     <script>
         const freeInput = document.getElementById('prompt-input');
         const adminInput = document.getElementById('admin-prompt-input');
         const freeMessages = document.getElementById('free-messages');
         const adminMessages = document.getElementById('admin-messages');
 
+        let showUnprotected = false;
+
+        function toggleComparison() {
+            const btn = document.getElementById('toggle-comparison-btn');
+            const adminCol = document.getElementById('admin-column');
+            const freeCol = document.getElementById('free-column');
+            showUnprotected = !showUnprotected;
+            if (showUnprotected) {
+                adminCol.style.display = 'flex';
+                freeCol.style.maxWidth = 'none';
+                btn.innerText = 'Hide Comparison';
+            } else {
+                adminCol.style.display = 'none';
+                freeCol.style.maxWidth = '600px';
+                btn.innerText = 'Compare Unprotected';
+            }
+        }
+
         // Synchronize inputs instantly
         freeInput.addEventListener('input', (e) => {
             adminInput.value = e.target.value;
         });
-
-        async function updateBudgetMeter() {
-            try {
-                // Free budget tracking query
-                const res = await fetch(`/api/budget/phase10_free/free`);
-                const data = await res.json();
-                
-                const percentSpan = document.getElementById('budget-percent');
-                const bar = document.getElementById('budget-bar');
-                const text = document.getElementById('budget-text');
-                
-                const p = Math.max(0, Math.min(100, data.percentage));
-                percentSpan.innerText = `${p.toFixed(1)}%`;
-                bar.style.width = `${p}%`;
-                
-                if (p > 50) { 
-                    bar.style.background = "#047857"; // Imperial Emerald
-                    percentSpan.style.color = "#047857"; 
-                }
-                else if (p > 20) { 
-                    bar.style.background = "#C5A059"; // Champagne Gold
-                    percentSpan.style.color = "#C5A059"; 
-                }
-                else { 
-                    bar.style.background = "#991B1B"; // Deep Garnet
-                    percentSpan.style.color = "#991B1B"; 
-                }
-                
-                text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
-            } catch (err) {
-                console.error("Failed to fetch budget:", err);
-            }
-        }
-        
-        window.onload = updateBudgetMeter;
 
         function appendMessage(container, text, type, meta = '') {
             const wrapper = document.createElement('div');
@@ -286,40 +257,22 @@
             
             // Append users messages
             appendMessage(freeMessages, prompt, 'user');
-            appendMessage(adminMessages, prompt, 'user');
             
-            freeInput.value = '';
-            adminInput.value = '';
-            
-            // Update statuses to working
             const freeBadge = document.getElementById('free-status-badge');
-            const adminBadge = document.getElementById('admin-status-badge');
-            
             freeBadge.innerText = "ANALYZING...";
             freeBadge.style.background = "#ECFDF5";
             freeBadge.style.color = "#047857";
             freeBadge.style.borderColor = "#047857";
             
-            adminBadge.innerText = "GENERATING...";
-            adminBadge.style.background = "#FAFBFB";
-            adminBadge.style.color = "#0B1E36";
-            adminBadge.style.borderColor = "#E2E8F0";
-            
-            // Loading placeholder message
             const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot");
-            const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
             
-            // Dispatch parallel requests
+            freeInput.value = '';
+            adminInput.value = '';
+
             const freePromise = fetch("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: "phase10_free", tier: "free", prompt: prompt })
-            });
-
-            const adminPromise = fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: "phase10_admin", tier: "admin", prompt: prompt })
             });
 
             // Handle Free Tier Completion
@@ -379,7 +332,6 @@
                     freeBadge.style.color = "#991B1B";
                     freeBadge.style.borderColor = "#FCA5A5";
                 }
-                updateBudgetMeter();
             }).catch((err) => {
                 freeMessages.removeChild(freeLoadMsg);
                 appendMessage(freeMessages, `Network Error: ${err.message}`, 'error');
@@ -389,36 +341,54 @@
                 freeBadge.style.borderColor = "#FCA5A5";
             });
 
-            // Handle Admin Tier Completion
-            adminPromise.then(async (res) => {
-                const data = await res.json();
-                adminMessages.removeChild(adminLoadMsg);
+            // Handle Unprotected ONLY if comparison mode is enabled
+            if (showUnprotected) {
+                appendMessage(adminMessages, prompt, 'user');
                 
-                if (res.ok) {
-                    appendMessage(adminMessages, data.text, 'bot');
-                    document.getElementById('admin-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
-                    document.getElementById('admin-metric-latency').innerText = `${data.latency_ms}ms`;
-                    document.getElementById('admin-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                const adminBadge = document.getElementById('admin-status-badge');
+                adminBadge.innerText = "GENERATING...";
+                adminBadge.style.background = "#FAFBFB";
+                adminBadge.style.color = "#0B1E36";
+                adminBadge.style.borderColor = "#E2E8F0";
+                
+                const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
+
+                const adminPromise = fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: "phase10_admin", tier: "admin", prompt: prompt })
+                });
+
+                adminPromise.then(async (res) => {
+                    const data = await res.json();
+                    adminMessages.removeChild(adminLoadMsg);
                     
-                    adminBadge.innerText = "COMPLETED";
-                    adminBadge.style.background = "#ECFDF5";
-                    adminBadge.style.color = "#047857";
-                    adminBadge.style.borderColor = "#A7F3D0";
-                } else {
-                    appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
-                    adminBadge.innerText = "FAILED";
+                    if (res.ok) {
+                        appendMessage(adminMessages, data.text, 'bot');
+                        document.getElementById('admin-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
+                        document.getElementById('admin-metric-latency').innerText = `${data.latency_ms}ms`;
+                        document.getElementById('admin-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                        
+                        adminBadge.innerText = "COMPLETED";
+                        adminBadge.style.background = "#ECFDF5";
+                        adminBadge.style.color = "#047857";
+                        adminBadge.style.borderColor = "#A7F3D0";
+                    } else {
+                        appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
+                        adminBadge.innerText = "FAILED";
+                        adminBadge.style.background = "#FEF2F2";
+                        adminBadge.style.color = "#991B1B";
+                        adminBadge.style.borderColor = "#FCA5A5";
+                    }
+                }).catch((err) => {
+                    adminMessages.removeChild(adminLoadMsg);
+                    appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
+                    adminBadge.innerText = "ERROR";
                     adminBadge.style.background = "#FEF2F2";
                     adminBadge.style.color = "#991B1B";
                     adminBadge.style.borderColor = "#FCA5A5";
-                }
-            }).catch((err) => {
-                adminMessages.removeChild(adminLoadMsg);
-                appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
-                adminBadge.innerText = "ERROR";
-                adminBadge.style.background = "#FEF2F2";
-                adminBadge.style.color = "#991B1B";
-                adminBadge.style.borderColor = "#FCA5A5";
-            });
+                });
+            }
         }
     </script>
 </body>
