@@ -3,117 +3,204 @@
 <head>
     <title>Token Burn | Chat Interface</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; background: #f0f4f8; }
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+            display: flex; 
+            justify-content: center;
+            align-items: center;
+            height: 100vh; 
+            background: #0B1E36; 
+            color: #0B1E36; 
+        }
         
-        /* Main Chat Section */
-        #chat-section { flex: 1; display: flex; flex-direction: column; background: white; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-        .header { padding: 20px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { margin: 0; font-size: 1.5em; color: #333; }
+        /* Floating elevated chatbot window */
+        #chat-section { 
+            width: 90%;
+            max-width: 1200px;
+            height: 85vh;
+            display: flex; 
+            flex-direction: column; 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 12px;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            overflow: hidden;
+        }
         
-        .msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; line-height: 1.4; word-wrap: break-word; font-size: 0.9em; }
-        .msg.user { background: #1976d2; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .msg.bot { background: #f1f3f4; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .msg.error { background: #ffebee; color: #c62828; align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid #ef9a9a; }
+        .header { 
+            padding: 20px; 
+            background: #FFFFFF; 
+            border-bottom: 1px solid #E2E8F0; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-family: 'Lora', Georgia, serif; 
+            font-size: 1.4em; 
+            color: #0B1E36; 
+            font-weight: 700; 
+        }
         
-        /* Sidebar container to hold Free Daily Budget */
-        #attack-sidebar { width: 300px; background: #263238; color: white; padding: 20px; display: flex; flex-direction: column; gap: 20px; box-sizing: border-box; }
+        .msg { 
+            max-width: 85%; 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            line-height: 1.5; 
+            word-wrap: break-word; 
+            font-size: 0.92em; 
+        }
+        .msg.user { 
+            background: #0B1E36; 
+            color: #FFFFFF; 
+            align-self: flex-end; 
+            border-bottom-right-radius: 2px; 
+            border: 1px solid #0B1E36;
+        }
+        .msg.bot { 
+            background: #FFFFFF; 
+            color: #0B1E36; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 2px; 
+            border: 1px solid #E2E8F0;
+        }
+        .msg.error { 
+            background: #FEF2F2; 
+            color: #991B1B; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 2px; 
+            border: 1px solid #FCA5A5; 
+        }
         
-        .metric-group { display: flex; flex-wrap: wrap; gap: 10px; }
-        .metric-badge { background: #e0e0e0; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
-        .metric-badge.highlight { background: #bbdefb; color: #0d47a1; }
+        .metric-group { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 10px; 
+            align-items: center;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85em;
+        }
+        .metric-badge { 
+            background: #F8F9FA; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            font-weight: 500; 
+            color: #0B1E36;
+            border: 1px solid #E2E8F0;
+        }
+        .metric-badge.highlight { 
+            background: #ECFDF5; 
+            color: #047857; 
+            border: 1px solid #A7F3D0;
+        }
+        .metric-badge.rose-highlight {
+            background: #F8E7EA;
+            color: #A85D68;
+            border: 1px solid #C98F98;
+        }
+        
+        input[type="text"] {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9em;
+        }
+        
+        .send-btn {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            transition: background 0.15s, color 0.15s;
+        }
+        .send-btn:hover {
+            background: #C5A059 !important;
+            color: #FFFFFF !important;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Main Chat Section -->
+    <!-- Main Elevated Chat Section -->
     <div id="chat-section">
         <div class="header">
-            <h1>LLM Interface (Comparison Mode)</h1>
-            <a href="/dashboard-ui" target="_blank" style="color: #1976d2; text-decoration: none; font-weight: bold;">Open Dashboard ↗</a>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <h1>LLM Interface</h1>
+                <button id="toggle-comparison-btn" onclick="toggleComparison()" style="padding: 8px 16px; background: #0B1E36; color: #FFFFFF; border: 1px solid #0B1E36; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9em; transition: background 0.15s;">Compare Unprotected</button>
+            </div>
+            <a href="/dashboard-ui" target="_blank" style="color: #0B1E36; text-decoration: none; font-weight: 600; font-size: 0.9em; border-bottom: 2px solid #C5A059; padding-bottom: 2px;">Open Dashboard ↗</a>
         </div>
         
         <!-- Side-by-Side Containers -->
-        <div style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box;">
+        <div id="chat-container" style="flex: 1; display: flex; gap: 20px; padding: 20px; overflow: hidden; box-sizing: border-box; justify-content: center; align-items: stretch; width: 100%;">
             
-            <!-- Protected Column -->
-            <div id="free-column" style="flex: 1; display: flex; flex-direction: column; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-                <div style="background: #e8f5e9; color: #2e7d32; padding: 10px 15px; font-weight: bold; border-bottom: 1px solid #c8e6c9; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; flex-direction: column;">
-                        <span>🛡 PROTECTED</span>
-                        <span style="font-size: 0.75em; color: #2e7d32; font-weight: normal; margin-top: 2px;">CostShield Active</span>
+            <!-- Protected Column (default centered width) -->
+            <div id="free-column" style="flex: 1; max-width: 600px; display: flex; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; transition: max-width 0.25s ease-in-out;">
+                <div style="background: #ECFDF5; color: #047857; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
+                        <span style="letter-spacing: 0.5px; font-weight: 700;">PROTECTED</span>
+                        <span style="font-size: 0.75em; color: #047857; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Shield Active</span>
                     </div>
-                    <span id="free-status-badge" style="font-size: 0.75em; background: #c8e6c9; padding: 2px 8px; border-radius: 12px; font-weight: bold;">READY</span>
+                    <span id="free-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #047857; border: 1px solid #A7F3D0; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
                 </div>
                 
-                <div id="free-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                <div id="free-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #FAFBFB;">
                     <div class="msg bot">Hello! I am the Protected Mock LLM. Send a prompt to test my defenses.</div>
                 </div>
                 
                 <!-- Protected Metrics Info -->
-                <div id="free-metrics" style="padding: 10px 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0; font-size: 0.75em; color: #455a64; line-height: 1.5;">
+                <div id="free-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0; font-size: 0.85em; color: #0B1E36; line-height: 1.5;">
                     <div class="metric-group">
-                        <span>Cost: <strong id="free-metric-cost">$0.00000</strong></span> |
-                        <span>Latency: <strong id="free-metric-latency">0ms</strong></span> |
+                        <span>Cost: <strong id="free-metric-cost" style="color: #047857;">$0.00000</strong></span> |
+                        <span>Latency: <strong id="free-metric-latency" style="color: #C5A059;">0ms</strong></span> |
                         <span>Tokens: <strong id="free-metric-tokens">0 In / 0 Out</strong></span>
                     </div>
-                    <div style="margin-top: 5px; border-top: 1px dashed #cfd8dc; padding-top: 5px;" class="metric-group">
+                    <div style="margin-top: 5px; border-top: 1px dashed #E2E8F0; padding-top: 5px;" class="metric-group">
                         <span class="metric-badge highlight" id="free-metric-score-badge">Score: <strong id="free-metric-score">0</strong></span>
                         <span class="metric-badge highlight">Action: <strong id="free-metric-action">ALLOW</strong></span>
-                        <span id="free-metric-reason" style="color: #757575;"></span>
+                        <span id="free-metric-reason" style="color: #991B1B; font-family: 'IBM Plex Mono', monospace; font-size: 0.95em;"></span>
                     </div>
                 </div>
                 
-                <div style="padding: 15px; background: #fff; border-top: 1px solid #e0e0e0;">
+                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0;">
                     <div style="display: flex; gap: 10px;">
-                        <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid #cfd8dc; border-radius: 20px; outline: none; font-size: 0.95em;" onkeypress="if(event.key === 'Enter') sendChat()">
-                        <button class="send-btn" onclick="sendChat()" style="padding: 8px 20px; background: #1976d2; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">Send</button>
+                        <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; font-size: 0.9em; background: #F8F9FA; color: #0B1E36;">
+                        <button class="send-btn" onclick="sendChat()" style="padding: 8px 20px; background: #047857; color: #FFFFFF; border: none; border-radius: 20px; cursor: pointer; font-weight: bold;">Send</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Unprotected Column -->
-            <div id="admin-column" style="flex: 1; display: flex; flex-direction: column; background: #fafafa; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-                <div style="background: #eceff1; color: #37474f; padding: 10px 15px; font-weight: bold; border-bottom: 1px solid #cfd8dc; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; flex-direction: column;">
-                        <span>⚡ UNPROTECTED</span>
-                        <span style="font-size: 0.75em; color: #37474f; font-weight: normal; margin-top: 2px;">Baseline</span>
+            <!-- Unprotected Column (hidden by default, dusty rose theme) -->
+            <div id="admin-column" style="display: none; flex: 1; flex-direction: column; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border-color: #C98F98;">
+                <div style="background: #F8E7EA; color: #A85D68; padding: 12px 15px; font-weight: bold; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column; font-family: 'Lora', Georgia, serif;">
+                        <span style="letter-spacing: 0.5px; font-weight: 700;">UNPROTECTED</span>
+                        <span style="font-size: 0.75em; color: #A85D68; font-weight: 500; margin-top: 2px; font-family: 'Inter', sans-serif;">Baseline</span>
                     </div>
-                    <span id="admin-status-badge" style="font-size: 0.75em; background: #cfd8dc; padding: 2px 8px; border-radius: 12px; font-weight: bold;">READY</span>
+                    <span id="admin-status-badge" style="font-size: 0.7em; background: #FFFFFF; color: #A85D68; border: 1px solid #C98F98; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-family: 'IBM Plex Mono', monospace;">READY</span>
                 </div>
                 
-                <div id="admin-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+                <div id="admin-messages" style="flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #FAFBFB;">
                     <div class="msg bot">Hello! I am the Baseline Mock LLM. I bypass all budget controls and scoring evaluations.</div>
                 </div>
                 
                 <!-- Unprotected Metrics Info -->
-                <div id="admin-metrics" style="padding: 10px 15px; background: #f5f5f5; border-top: 1px solid #e0e0e0; font-size: 0.75em; color: #455a64; line-height: 1.5; min-height: 38px; display: flex; align-items: center;">
+                <div id="admin-metrics" style="padding: 10px 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0; font-size: 0.85em; color: #0B1E36; line-height: 1.5; min-height: 38px; display: flex; align-items: center;">
                     <div class="metric-group">
-                        <span>Cost: <strong id="admin-metric-cost">$0.00000</strong></span> |
-                        <span>Latency: <strong id="admin-metric-latency">0ms</strong></span> |
+                        <span>Cost: <strong id="admin-metric-cost" style="color: #991B1B;">$0.00000</strong></span> |
+                        <span>Latency: <strong id="admin-metric-latency" style="color: #C5A059;">0ms</strong></span> |
                         <span>Tokens: <strong id="admin-metric-tokens">0 In / 0 Out</strong></span>
                     </div>
                 </div>
                 
-                <div style="padding: 15px; background: #fff; border-top: 1px solid #e0e0e0;">
-                    <input type="text" id="admin-prompt-input" placeholder="[Mirrored Prompt]" readonly style="width: 100%; padding: 10px 15px; border: 1px solid #e0e0e0; border-radius: 20px; outline: none; background: #f5f5f5; color: #757575; cursor: not-allowed; box-sizing: border-box; font-size: 0.95em;">
+                <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid #E2E8F0;">
+                    <input type="text" id="admin-prompt-input" placeholder="[Mirrored Prompt]" readonly style="width: 100%; padding: 10px 15px; border: 1px solid #E2E8F0; border-radius: 20px; outline: none; background: #F8F9FA; color: #94A3B8; cursor: not-allowed; box-sizing: border-box; font-size: 0.9em;">
                 </div>
             </div>
             
-        </div>
-    </div>
-
-    <!-- Sidebar to hold budget widgets -->
-    <div id="attack-sidebar">
-        <!-- Budget Widget -->
-        <div id="budget-widget" style="background: #1c252a; padding: 15px; border-radius: 8px;">
-            <h3 style="margin: 0 0 10px 0; font-size: 1em; color: #eceff1; display: flex; justify-content: space-between;">
-                <span>Free Daily Budget</span>
-                <span id="budget-percent" style="color: #4caf50;">100%</span>
-            </h3>
-            <div style="background: #37474f; border-radius: 4px; height: 10px; width: 100%; overflow: hidden;">
-                <div id="budget-bar" style="background: #4caf50; height: 100%; width: 100%; transition: width 0.3s;"></div>
-            </div>
-            <div id="budget-text" style="font-size: 0.85em; color: #b0bec5; margin-top: 8px;">Loading...</div>
         </div>
     </div>
 
@@ -123,36 +210,28 @@
         const freeMessages = document.getElementById('free-messages');
         const adminMessages = document.getElementById('admin-messages');
 
+        let showUnprotected = false;
+
+        function toggleComparison() {
+            const btn = document.getElementById('toggle-comparison-btn');
+            const adminCol = document.getElementById('admin-column');
+            const freeCol = document.getElementById('free-column');
+            showUnprotected = !showUnprotected;
+            if (showUnprotected) {
+                adminCol.style.display = 'flex';
+                freeCol.style.maxWidth = 'none';
+                btn.innerText = 'Hide Comparison';
+            } else {
+                adminCol.style.display = 'none';
+                freeCol.style.maxWidth = '600px';
+                btn.innerText = 'Compare Unprotected';
+            }
+        }
+
         // Synchronize inputs instantly
         freeInput.addEventListener('input', (e) => {
             adminInput.value = e.target.value;
         });
-
-        async function updateBudgetMeter() {
-            try {
-                // Free budget tracking query
-                const res = await fetch(`/api/budget/phase10_free/free`);
-                const data = await res.json();
-                
-                const percentSpan = document.getElementById('budget-percent');
-                const bar = document.getElementById('budget-bar');
-                const text = document.getElementById('budget-text');
-                
-                const p = Math.max(0, Math.min(100, data.percentage));
-                percentSpan.innerText = `${p.toFixed(1)}%`;
-                bar.style.width = `${p}%`;
-                
-                if (p > 50) { bar.style.background = "#4caf50"; percentSpan.style.color = "#4caf50"; }
-                else if (p > 20) { bar.style.background = "#ff9800"; percentSpan.style.color = "#ff9800"; }
-                else { bar.style.background = "#f44336"; percentSpan.style.color = "#f44336"; }
-                
-                text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
-            } catch (err) {
-                console.error("Failed to fetch budget:", err);
-            }
-        }
-        
-        window.onload = updateBudgetMeter;
 
         function appendMessage(container, text, type, meta = '') {
             const wrapper = document.createElement('div');
@@ -163,6 +242,7 @@
                 metaDiv.style.fontSize = '0.8em';
                 metaDiv.style.marginTop = '4px';
                 metaDiv.style.opacity = '0.8';
+                metaDiv.style.fontFamily = "'IBM Plex Mono', monospace";
                 metaDiv.innerText = meta;
                 wrapper.appendChild(metaDiv);
             }
@@ -177,38 +257,22 @@
             
             // Append users messages
             appendMessage(freeMessages, prompt, 'user');
-            appendMessage(adminMessages, prompt, 'user');
+            
+            const freeBadge = document.getElementById('free-status-badge');
+            freeBadge.innerText = "ANALYZING...";
+            freeBadge.style.background = "#ECFDF5";
+            freeBadge.style.color = "#047857";
+            freeBadge.style.borderColor = "#047857";
+            
+            const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot");
             
             freeInput.value = '';
             adminInput.value = '';
-            
-            // Update statuses to working
-            const freeBadge = document.getElementById('free-status-badge');
-            const adminBadge = document.getElementById('admin-status-badge');
-            
-            freeBadge.innerText = "ANALYZING...";
-            freeBadge.style.background = "#ffe082";
-            freeBadge.style.color = "#b78103";
-            
-            adminBadge.innerText = "GENERATING...";
-            adminBadge.style.background = "#ffe082";
-            adminBadge.style.color = "#b78103";
-            
-            // Loading placeholder message
-            const freeLoadMsg = appendMessage(freeMessages, "⟳ Processing request through pipeline defenses...", "bot");
-            const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
-            
-            // Dispatch parallel requests
+
             const freePromise = fetch("/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_id: "phase10_free", tier: "free", prompt: prompt })
-            });
-
-            const adminPromise = fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_id: "phase10_admin", tier: "admin", prompt: prompt })
             });
 
             // Handle Free Tier Completion
@@ -229,14 +293,28 @@
                     } else {
                         scoreBadge.style.display = 'inline-block';
                         document.getElementById('free-metric-score').innerText = score;
+                        if (score >= 8) {
+                            scoreBadge.style.color = '#991B1B';
+                            scoreBadge.style.borderColor = '#FCA5A5';
+                            scoreBadge.style.background = '#FEF2F2';
+                        } else if (score >= 5) {
+                            scoreBadge.style.color = '#C5A059';
+                            scoreBadge.style.borderColor = '#F5E3C3';
+                            scoreBadge.style.background = '#FDFBF7';
+                        } else {
+                            scoreBadge.style.color = '#047857';
+                            scoreBadge.style.borderColor = '#A7F3D0';
+                            scoreBadge.style.background = '#ECFDF5';
+                        }
                     }
                     
                     document.getElementById('free-metric-action').innerText = data._debug_action;
                     document.getElementById('free-metric-reason').innerText = data._debug_reasons.length > 0 ? `(${data._debug_reasons.join(', ')})` : '';
                     
                     freeBadge.innerText = "COMPLETED";
-                    freeBadge.style.background = "#c8e6c9";
-                    freeBadge.style.color = "#2e7d32";
+                    freeBadge.style.background = "#ECFDF5";
+                    freeBadge.style.color = "#047857";
+                    freeBadge.style.borderColor = "#A7F3D0";
                 } else {
                     appendMessage(freeMessages, `Blocked: ${data.detail}`, 'error');
                     document.getElementById('free-metric-cost').innerText = "$0.00000";
@@ -250,45 +328,67 @@
                     document.getElementById('free-metric-reason').innerText = `(${data.detail})`;
                     
                     freeBadge.innerText = "BLOCKED";
-                    freeBadge.style.background = "#ffcdd2";
-                    freeBadge.style.color = "#c62828";
+                    freeBadge.style.background = "#FEF2F2";
+                    freeBadge.style.color = "#991B1B";
+                    freeBadge.style.borderColor = "#FCA5A5";
                 }
-                updateBudgetMeter();
             }).catch((err) => {
                 freeMessages.removeChild(freeLoadMsg);
                 appendMessage(freeMessages, `Network Error: ${err.message}`, 'error');
                 freeBadge.innerText = "ERROR";
-                freeBadge.style.background = "#ffcdd2";
-                freeBadge.style.color = "#c62828";
+                freeBadge.style.background = "#FEF2F2";
+                freeBadge.style.color = "#991B1B";
+                freeBadge.style.borderColor = "#FCA5A5";
             });
 
-            // Handle Admin Tier Completion
-            adminPromise.then(async (res) => {
-                const data = await res.json();
-                adminMessages.removeChild(adminLoadMsg);
+            // Handle Unprotected ONLY if comparison mode is enabled
+            if (showUnprotected) {
+                appendMessage(adminMessages, prompt, 'user');
                 
-                if (res.ok) {
-                    appendMessage(adminMessages, data.text, 'bot');
-                    document.getElementById('admin-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
-                    document.getElementById('admin-metric-latency').innerText = `${data.latency_ms}ms`;
-                    document.getElementById('admin-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                const adminBadge = document.getElementById('admin-status-badge');
+                adminBadge.innerText = "GENERATING...";
+                adminBadge.style.background = "#FAFBFB";
+                adminBadge.style.color = "#0B1E36";
+                adminBadge.style.borderColor = "#E2E8F0";
+                
+                const adminLoadMsg = appendMessage(adminMessages, "⟳ Processing request directly (unprotected)...", "bot");
+
+                const adminPromise = fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_id: "phase10_admin", tier: "admin", prompt: prompt })
+                });
+
+                adminPromise.then(async (res) => {
+                    const data = await res.json();
+                    adminMessages.removeChild(adminLoadMsg);
                     
-                    adminBadge.innerText = "COMPLETED";
-                    adminBadge.style.background = "#c8e6c9";
-                    adminBadge.style.color = "#2e7d32";
-                } else {
-                    appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
-                    adminBadge.innerText = "FAILED";
-                    adminBadge.style.background = "#ffcdd2";
-                    adminBadge.style.color = "#c62828";
-                }
-            }).catch((err) => {
-                adminMessages.removeChild(adminLoadMsg);
-                appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
-                adminBadge.innerText = "ERROR";
-                adminBadge.style.background = "#ffcdd2";
-                adminBadge.style.color = "#c62828";
-            });
+                    if (res.ok) {
+                        appendMessage(adminMessages, data.text, 'bot');
+                        document.getElementById('admin-metric-cost').innerText = `$${data.cost.total_cost.toFixed(5)}`;
+                        document.getElementById('admin-metric-latency').innerText = `${data.latency_ms}ms`;
+                        document.getElementById('admin-metric-tokens').innerText = `${data.input_tokens} In / ${data.output_tokens} Out`;
+                        
+                        adminBadge.innerText = "COMPLETED";
+                        adminBadge.style.background = "#ECFDF5";
+                        adminBadge.style.color = "#047857";
+                        adminBadge.style.borderColor = "#A7F3D0";
+                    } else {
+                        appendMessage(adminMessages, `Error: ${data.detail}`, 'error');
+                        adminBadge.innerText = "FAILED";
+                        adminBadge.style.background = "#FEF2F2";
+                        adminBadge.style.color = "#991B1B";
+                        adminBadge.style.borderColor = "#FCA5A5";
+                    }
+                }).catch((err) => {
+                    adminMessages.removeChild(adminLoadMsg);
+                    appendMessage(adminMessages, `Network Error: ${err.message}`, 'error');
+                    adminBadge.innerText = "ERROR";
+                    adminBadge.style.background = "#FEF2F2";
+                    adminBadge.style.color = "#991B1B";
+                    adminBadge.style.borderColor = "#FCA5A5";
+                });
+            }
         }
     </script>
 </body>
