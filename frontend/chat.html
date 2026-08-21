@@ -168,6 +168,17 @@
                     </div>
                 </div>
                 
+                <!-- Budget Widget -->
+                <div style="padding: 10px 15px; background: #F8F9FA; border-top: 1px dashed rgba(11, 30, 54, 0.10);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.8em; font-weight: 700; color: #475569; font-family: 'Inter', sans-serif; letter-spacing: 0.5px;">
+                        <span>DAILY BUDGET (<span id="budget-percent">100%</span>)</span>
+                        <span id="budget-text" style="font-family: 'IBM Plex Mono', monospace;">Loading...</span>
+                    </div>
+                    <div style="background: #E2E8F0; border-radius: 4px; height: 6px; width: 100%; overflow: hidden;">
+                        <div id="budget-bar" style="background: #059669; height: 100%; width: 100%; transition: width 0.3s ease, background 0.3s ease;"></div>
+                    </div>
+                </div>
+
                 <div style="padding: 15px; background: #FFFFFF; border-top: 1px solid rgba(11, 30, 54, 0.10);">
                     <div style="display: flex; gap: 10px;">
                         <input type="text" id="prompt-input" placeholder="Enter prompt to evaluate..." style="flex: 1; padding: 10px 15px; border: 1px solid rgba(11, 30, 54, 0.14); border-radius: 20px; outline: none; font-size: 0.9em; background: #F8F9FA; color: #0B1E36;">
@@ -216,6 +227,39 @@
         let showUnprotected = false;
         let freeHistory = JSON.parse(sessionStorage.getItem('freeHistory')) || [];
         let adminHistory = JSON.parse(sessionStorage.getItem('adminHistory')) || [];
+
+        async function updateBudgetMeter() {
+            try {
+                const res = await fetch('/api/budget/phase10_free/free');
+                const data = await res.json();
+                
+                const percentSpan = document.getElementById('budget-percent');
+                const bar = document.getElementById('budget-bar');
+                const text = document.getElementById('budget-text');
+                
+                if (data.limit_usd === "Unlimited") {
+                    percentSpan.innerText = "∞";
+                    bar.style.width = "100%";
+                    bar.style.background = "#3B82F6";
+                    percentSpan.style.color = "#3B82F6";
+                    text.innerText = "Unlimited (Admin Tier)";
+                } else {
+                    const p = Math.max(0, Math.min(100, data.percentage));
+                    percentSpan.innerText = `${p.toFixed(1)}%`;
+                    bar.style.width = `${p}%`;
+                    
+                    if (p > 50) { bar.style.background = "#059669"; percentSpan.style.color = "#059669"; }
+                    else if (p > 20) { bar.style.background = "#D97706"; percentSpan.style.color = "#D97706"; }
+                    else { bar.style.background = "#DC2626"; percentSpan.style.color = "#DC2626"; }
+                    
+                    text.innerText = `$${data.remaining_usd.toFixed(4)} remaining of $${data.limit_usd.toFixed(2)}`;
+                }
+            } catch (err) {
+                console.error("Failed to fetch budget:", err);
+            }
+        }
+        
+        window.onload = updateBudgetMeter;
 
         function toggleComparison() {
             const btn = document.getElementById('toggle-comparison-btn');
@@ -468,6 +512,8 @@
                 saveCost('protectedList', reqIndex, 0.0);
                 recordEvent("phase10_free", "free", 0.0, "ERROR", 0, 0, 100, 0, "NONE");
                 saveMetrics();
+            }).finally(() => {
+                updateBudgetMeter();
             });
 
             // Handle Unprotected ONLY if comparison mode is enabled

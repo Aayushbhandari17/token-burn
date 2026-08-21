@@ -14,10 +14,10 @@ async def send_request(session, user_id, tier, prompt):
     async with session.post(URL, json=payload) as response:
         return response.status, await response.json()
 
-async def run_context_attack():
-    print("\n--- Running Context Stuffer Attack on 'free' tier ---")
-    user_id = f"context_free_{int(time.time())}"
-    tier = "free"
+async def run_context_attack(tier="free", user_id=None):
+    if not user_id:
+        user_id = f"context_{tier}_{int(time.time())}"
+    print(f"\n--- Running Context Stuffer Attack on '{tier}' tier ---")
     
     current_prompt = "Start of prompt. "
     allowed = 0
@@ -39,9 +39,15 @@ async def run_context_attack():
                 denied += 1
                 print(f"  [DENY] HTTP {status} | Error: {data.get('detail')}")
 
-    print(f"\nTotal Attempted: 11")
+    print(f"\nTier: {tier}")
+    print(f"Total Attempted: 11")
     print(f"Allowed: {allowed}")
     print(f"Denied: {denied}")
 
 if __name__ == "__main__":
-    asyncio.run(run_context_attack())
+    async def main():
+        timestamp = int(time.time())
+        await run_context_attack("free", f"context_free_{timestamp}")
+        await run_context_attack("admin", f"context_admin_{timestamp}")
+        
+    asyncio.run(main())

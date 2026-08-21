@@ -5,10 +5,10 @@ import time
 URL = "http://127.0.0.1:8000/chat"
 PROMPT = "Quick simple query."
 
-async def send_request(session, user_id):
+async def send_request(session, user_id, tier):
     payload = {
         "user_id": user_id,
-        "tier": "free",
+        "tier": tier,
         "prompt": PROMPT
     }
     try:
@@ -19,10 +19,10 @@ async def send_request(session, user_id):
     except Exception as e:
         return 500, {"detail": str(e)}
 
-async def run_sybil_attack():
-    print("\n--- Running Sybil Burst Attack ---")
+async def run_sybil_attack(tier="free"):
+    print(f"\n--- Running Sybil Burst Attack on '{tier}' tier ---")
     timestamp = int(time.time())
-    users = [f"sybil_{timestamp}_{i:03d}" for i in range(10)]
+    users = [f"sybil_{tier}_{timestamp}_{i:03d}" for i in range(10)]
     requests_per_user = 15
     
     total_allowed = 0
@@ -35,7 +35,7 @@ async def run_sybil_attack():
         tasks = []
         for i in range(requests_per_user):
             for user_id in users:
-                tasks.append((user_id, send_request(session, user_id)))
+                tasks.append((user_id, send_request(session, user_id, tier)))
                 
         # Actually run them
         results = await asyncio.gather(*(t[1] for t in tasks))
@@ -52,6 +52,7 @@ async def run_sybil_attack():
                 total_denied += 1
                 user_results[user_id]["denied"] += 1
 
+    print(f"Tier: {tier}")
     print(f"Total Users: {len(users)}")
     print(f"Requests per user: {requests_per_user}")
     print(f"\n--- Aggregate Results ---")
@@ -66,4 +67,8 @@ async def run_sybil_attack():
     print(f"... and {len(users)-3} more users with similar patterns.")
 
 if __name__ == "__main__":
-    asyncio.run(run_sybil_attack())
+    async def main():
+        await run_sybil_attack("free")
+        await run_sybil_attack("admin")
+    
+    asyncio.run(main())

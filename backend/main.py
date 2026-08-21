@@ -228,6 +228,7 @@ async def chat(request: ChatRequest):
     finally:
         if tier_config["daily_cost_limit"] != math.inf and cost_to_refund > 0:
             await budget_engine.refund(request.user_id, cost_to_refund)
+            await risk_scorer.refund_velocity(request.user_id, cost_to_refund)
             
         final_actual_cost = actual_cost if status == "SUCCESS" else 0.0
             

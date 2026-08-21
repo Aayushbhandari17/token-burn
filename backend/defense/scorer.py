@@ -87,3 +87,10 @@ class RiskScorer:
 
         # Repetition: Remember last prompt hash for 1 hour
         await self.redis.set(f"scorer:last_hash:{user_id}", prompt_hash, ex=3600)
+        
+    async def refund_velocity(self, user_id: str, amount: float):
+        """Refunds unused cost capacity from the 1-hour velocity tracker."""
+        if amount <= 0:
+            return
+        velocity_key = f"scorer:cost_1h:{user_id}"
+        await self.redis.incrbyfloat(velocity_key, -amount)
